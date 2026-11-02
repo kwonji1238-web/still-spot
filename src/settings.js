@@ -4,9 +4,9 @@ export const BUSAN_BOUNDS = { south: 34.88, west: 128.75, north: 35.40, east: 12
 
 // 확정 문구와 [제안]·열린 결정 값을 한 곳에 모은다. 바꿀 때는 이 파일만 고친다.
 
-// 확정 문구 (design.md 5장 "화면별 문구", naming.md)
+// 확정 문구 (DESIGN.md 6장 "화면별 문구")
 export const COPY = {
-  // 상단 서비스명(영문 워드마크). 한글 이름은 스틸스팟(naming.md), 화면 상단에는 이 표기를 쓴다.
+  // 상단 서비스명(영문 워드마크). 한글 이름은 스틸스팟이고, 화면 상단에는 이 표기를 쓴다.
   wordmark: 'STILL-SPOT',
   heroCopy: '영화 속 그 장소로 이어지는 길',
   searchPlaceholder: '국내 영화나 드라마를 검색하세요',
@@ -41,9 +41,9 @@ export const COPY = {
   tmdbCredit: '© TMDB - All movie-related data and images. (This product uses the TMDB API but is not endorsed or certified by TMDB.)',
   // TODO(열린 결정: S5 출처 문구) 관광지·식당 데이터 제공처를 확인한 뒤 정한다. 비어 있으면 화면에 칸을 만들지 않는다.
   placeSource: '',
-  // TODO(열린 결정: 토스트 문구와 표시 시간) design.md 5장의 예시 문구. 확정 아님.
+  // TODO(열린 결정: 토스트 문구와 표시 시간) 예시 문구라 확정이 아니다.
   copiedToast: '주소를 복사했어요',
-  // TODO(열린 결정: 오류 문구) design.md 5장의 예시 문구. 확정 아님.
+  // TODO(열린 결정: 오류 문구) 예시 문구라 확정이 아니다.
   loadError: '정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요',
   retry: '다시 시도',
   // "본인 위치" 버튼과 안내 팝업. 위치는 저장하지 않고 서버로 보내지 않는다. 부산 밖이면 부산으로 옮길지 묻고, 위치를 못 받으면 닫기만 있는 안내를 띄운다.
@@ -64,7 +64,7 @@ export const COPY = {
   sheetFold: '목록 접기',
   sheetUnfold: '목록 펼치기',
   fitWork: '이 작품의 촬영지 모두 보기',
-  // TODO(열린 결정: 테마 전환 버튼의 문구) design.md·naming.md에 없는 안내 문구라 임시로 정했다. 아이콘 버튼의 접근성 이름으로만 쓴다.
+  // TODO(열린 결정: 테마 전환 버튼의 문구) DESIGN.md에 없는 안내 문구라 임시로 정했다. 아이콘 버튼의 접근성 이름으로만 쓴다.
   themeToDark: '다크 모드로 전환',
   themeToLight: '라이트 모드로 전환',
 };
@@ -98,21 +98,21 @@ export const FEATURED = {
   ],
 };
 
-// TODO(열린 결정: 코스 후보 반경) PRD 6장. 1·2·3km 채움 비율을 계산한 뒤 정한다. 지금 값은 임시.
+// TODO(열린 결정: 코스 후보 반경) docs/data-schema.md 6장의 반경별 채움 비율을 보고 정한다. 지금 값은 임시.
 export const NEARBY_RADIUS_M = 3000;
 
 // 근처 미리보기(S3)와 근처 장소 핀(S2): 관광지 최대 2 + 식당 최대 1
 export const PREVIEW_LIMITS = { attraction: 2, restaurant: 1 };
 // 코스(S4): 관광지 최대 2 + 식당 최대 1 + 카페 최대 1
 export const COURSE_LIMITS = { attraction: 2, restaurant: 1, cafe: 1 };
-// TODO(열린 결정: 코스 표시 순서) 와이어프레임의 가정(촬영지 → 관광지 → 식당 → 카페)을 쓴다. 가까운 순 정렬은 미정.
+// TODO(열린 결정: 코스 표시 순서) 지금은 촬영지 → 관광지 → 식당 → 카페 순서를 쓴다. 가까운 순 정렬은 미정.
 export const COURSE_KIND_ORDER = ['spot', 'attraction', 'restaurant', 'cafe'];
 
-// TODO(열린 결정: OpenAI 대기 시간 기준) PRD 5장 미정. 넘으면 규칙 기반 코스로 대체한다.
+// TODO(열린 결정: OpenAI 대기 시간 기준) 정해진 값이 아니다. 넘으면 규칙 기반 코스로 대체한다.
 export const AI_TIMEOUT_MS = 9500; // 서버 함수의 대기 한도(netlify/functions/course.js, 8.5초)보다 길게 둔다
 
 // [제안] 토스트 표시 시간
 export const TOAST_MS = 2000;
 
 
-// TODO(열린 결정: 경로 지도 높이) PRD 6장 제안 약 200px. styles.css의 --route-map-h와 같이 바꾼다.
+// TODO(열린 결정: 경로 지도 높이) 약 200px을 임시로 쓴다. styles.css의 --route-map-h와 같이 바꾼다.

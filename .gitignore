@@ -8,3 +8,8 @@ node_modules/
 .claude/
 skills-lock.json
 ut/
+
+# 데이터 스크립트가 함께 만드는 점검용 파일(서비스는 읽지 않는다)
+data/geocode-failures.json
+data/restaurants-issues.json
+data/restaurants-review-sample.md

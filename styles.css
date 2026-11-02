@@ -1,6 +1,6 @@
-/* 스틸스팟 — 값은 docs/design.md를 따른다. 색은 토큰 이름으로만 참조한다. */
+/* 스틸스팟 — 값은 DESIGN.md를 따른다. 색은 토큰 이름으로만 참조한다. */
 
-/* ── 색 토큰 (design.md 2장 코드 그대로) ── */
+/* ── 색 토큰 (DESIGN.md 3장 코드 그대로) ── */
 :root {
   --canvas: #F6F5F2; --soft: #ECEAE5; --hair: #DCD9D3; --hair-s: #85817A;
   --ink: #1A1917;    --sub: #5E5A53;  --dis: #9A958C;
@@ -19,7 +19,7 @@
   --accent: #E78739; --error: #FF7B6B; color-scheme: dark;
 }
 
-/* 지도 위 고정 색 (모드와 상관없음, design.md 2장) */
+/* 지도 위 고정 색 (모드와 상관없음, DESIGN.md 3장) */
 :root {
   --map-pin-bg: #FFFFFF;
   --map-pin-ink: #1A1917;
@@ -27,7 +27,7 @@
   --map-pin-sel-ink: #FFFFFF;
   --map-pin-soft-bg: #ECEAE5; /* 근처 장소 핀 면. 흰 지도 위에서 잘 보이게 */
   --map-label-line: #85817A; /* [제안] 이름표 테두리: 라이트 hair-s 값 고정 */
-  /* TODO(열린 결정: 경로 지도 높이) PRD 6장 제안 약 200px */
+  /* TODO(열린 결정: 경로 지도 높이) 약 200px을 임시로 쓴다 */
   --route-map-h: 12.5rem;
   --sheet-r: 16px;
   --card-r: 16px;
@@ -63,7 +63,7 @@ img { display: block; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-/* ── 글자 단계 (design.md 3장) ── */
+/* ── 글자 단계 (DESIGN.md 4장) ── */
 /* 워드마크: 영문 서비스명 STILL-SPOT 전용. Michroma는 400 하나뿐이라 굵게 하지 않는다. */
 .wordmark { font-family: Michroma, "Pretendard Variable", Pretendard, system-ui, sans-serif; font-weight: 400; font-size: 0.875rem; line-height: 1.375rem; letter-spacing: 0; white-space: nowrap; }
 .t-display { font-size: 1.75rem; line-height: 2.25rem; font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; }
@@ -85,7 +85,7 @@ img { display: block; }
 .fc-tl { top: 0; left: 0; } .fc-tr { top: 0; right: 0; }
 .fc-bl { bottom: 0; left: 0; } .fc-br { bottom: 0; right: 0; }
 
-/* 번호 뱃지 28px (4-5) */
+/* 번호 뱃지 28px (DESIGN.md 5-4) */
 .badge {
   flex: none; width: 1.75rem; height: 1.75rem; display: grid; place-items: center;
   color: var(--ink); border-radius: 0;
@@ -94,7 +94,7 @@ img { display: block; }
 .badge.is-none { color: var(--sub); }
 .badge.is-none .n { color: var(--sub); }
 
-/* 빈 프레임 타일 (4-8) */
+/* 빈 프레임 타일 (DESIGN.md 5-11) */
 .tile { flex: none; width: 3.5rem; height: 3.5rem; color: var(--hair-s); border-radius: 0; overflow: hidden; }
 .tile img { width: 100%; height: 100%; object-fit: cover; }
 .poster { flex: none; width: 4rem; height: 5.75rem; color: var(--hair-s); overflow: hidden; }
@@ -103,10 +103,10 @@ img { display: block; }
 .poster.is-logo { display: grid; place-items: center; background: var(--soft); color: var(--ink); }
 .poster.is-logo .logo-mark { width: 2rem; height: 2rem; }
 
-/* 상태 점: "주소만 표시"(빈 고리)만 쓴다 (4-11) */
+/* 상태 점: "주소만 표시"(빈 고리)만 쓴다 (DESIGN.md 7장) */
 .dot-ring { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--ink); border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
 
-/* ── 버튼 (4-2) ── */
+/* ── 버튼 (DESIGN.md 5-2) ── */
 .btn {
   display: flex; align-items: center; justify-content: center; width: 100%;
   min-height: 3.25rem; padding: 0 1rem; border-radius: var(--ctl-r);
@@ -130,7 +130,7 @@ img { display: block; }
   .btn-fill:hover { background: var(--sub); }
 }
 
-/* ── 칩 (4-3) ── */
+/* ── 칩 (DESIGN.md 5-5) ── */
 .chip-kind {
   display: inline-flex; align-items: center; min-height: 1.5rem; padding: 0 0.5rem;
   background: var(--soft); border-radius: var(--ctl-r); font-size: 0.75rem; line-height: 1.125rem; color: var(--ink);
@@ -138,7 +138,7 @@ img { display: block; }
 }
 .row:active .chip-kind, .card:active .chip-kind { background: var(--hair); }
 
-/* ── 검색창 (4-4) ── */
+/* ── 검색창 (DESIGN.md 5-3) ── */
 .search {
   display: flex; align-items: center; height: 3.5rem; border: 1px solid var(--hair-s);
   border-radius: var(--ctl-r); background: var(--canvas); padding-left: 1rem;
@@ -150,7 +150,7 @@ img { display: block; }
 .search input::-webkit-search-cancel-button { display: none; }
 .search .btn-icon { border: 0; background: transparent; }
 
-/* ── 목록 줄 (4-6) ── */
+/* ── 목록 줄 (DESIGN.md 5-5) ── */
 .list > li + li { border-top: 1px solid var(--hair); }
 .row {
   display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 4rem;
@@ -163,7 +163,7 @@ img { display: block; }
 .nearby .row { min-height: 4.5rem; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }
 
-/* ── 안내 상자·오류·토스트 (4-9) ── */
+/* ── 안내 상자·오류·토스트 (DESIGN.md 5-9) ── */
 .notice { border-radius: var(--ctl-r); padding: 0.75rem 0.875rem; background: var(--soft); color: var(--ink); font-size: 0.875rem; line-height: 1.375rem; }
 .notice.is-error { display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
 .notice.is-error .warn { flex: none; color: var(--error); width: 20px; height: 20px; margin-top: 1px; }
@@ -302,7 +302,7 @@ body[data-screen="spot"][data-layout="mobile"][data-map="on"] #map-wrap { displa
 .sheet.is-static .sheet-body { overflow: visible; }
 .map-ctrl.is-static { position: static; padding: 0.75rem 0 0.75rem; pointer-events: auto; }
 
-/* ── 지도 위 핀 (4-5) ── */
+/* ── 지도 위 핀 (DESIGN.md 5-4) ── */
 .pin {
   position: relative; width: 24px; height: 24px; display: grid; place-items: center;
   background: var(--map-pin-bg); color: var(--map-pin-ink); border-radius: 0;
@@ -380,7 +380,7 @@ button.pin::after { content: ""; position: absolute; inset: -10px; } /* 누르�
 .nearby-head { display: flex; flex-direction: column; gap: 0.125rem; }
 .nearby .list { margin: 0 -0.75rem; }
 
-/* 코스 타임라인 (4-7) */
+/* 코스 타임라인 (DESIGN.md 5-8) */
 .timeline > li { display: grid; grid-template-columns: 1.75rem 1fr; column-gap: 0.75rem; position: relative; padding-bottom: 0.75rem; }
 .timeline > li:last-child { padding-bottom: 0; }
 .timeline > li::before { content: ""; position: absolute; left: calc(0.875rem - 0.5px); top: 2.5rem; bottom: -0.75rem; width: 1px; background: var(--hair-s); }
@@ -394,7 +394,7 @@ button.pin::after { content: ""; position: absolute; inset: -10px; } /* 누르�
 .card .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
 .card .chev { flex: none; color: var(--sub); }
 
-/* 로딩·완성 (4-12) */
+/* 로딩·완성 (DESIGN.md 5-12) */
 .frame-msg { padding: 0.875rem 1rem; font-weight: 700; color: var(--ink); }
 .frame-msg .fc { color: var(--ink); }
 .frame-msg.is-loading .fc-tl { animation: fc-tl 1.8s ease-in-out infinite; }

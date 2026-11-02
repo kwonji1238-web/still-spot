@@ -260,7 +260,7 @@ function drawCourse(target, items) {
   });
   // 핀이 하나뿐이면 선 없이 핀만
   if (pts.length > 1) {
-    // TODO(열린 결정: 코스 경로선의 색·굵기) PRD 6장 제안 1px 직선. 지도 고정 색을 쓴다.
+    // TODO(열린 결정: 코스 경로선의 색·굵기) 지금은 1px 직선에 지도 고정 색을 쓴다.
     target.line = new kakao.maps.Polyline({
       path: pts.map(ll), strokeWeight: 1, strokeColor: '#1A1917', strokeOpacity: 1, strokeStyle: 'solid',
     });

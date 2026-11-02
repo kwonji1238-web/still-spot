@@ -35,7 +35,7 @@ export function adaptSpots(raw) {
       address: clean(r.roadNmAddr),
       lat: hasCoords ? lat : null,
       lng: hasCoords ? lng : null,
-      // 위치 정확도 3단계(design.md 4-11)에 쓸 수 있는 필드지만, 지금은 "주소만 표시"(빈 고리)만 쓴다.
+      // 위치 정확도 3단계에 쓸 수 있는 필드지만(DESIGN.md 7장), 지금은 "주소만 표시"(빈 고리)만 쓴다.
       geocodeStatus: clean(r['변환상태']),
     };
   }).filter((s) => !isClosedSpot(s.name));
@@ -63,7 +63,7 @@ export function adaptAttractions(raw) {
 }
 
 // 카페 분류: restaurants.json의 category를 쓴다(상호명 규칙은 수집 스크립트에서 이미 적용됨).
-// cafe_candidate 20곳은 data/cafe-candidates-review.md에서 사람이 전부 "카페"로 판정했으므로 카페로 둔다.
+// cafe_candidate 20곳은 사람이 검토해 전부 카페로 판정했으므로 카페로 둔다.
 // 휴업·폐업 안내가 있는 곳(closed_notice)은 코스 후보에서 뺀다.
 // 식당·카페는 작은 사진 주소(MAIN_IMG_THUMB, 417×320)만 있어 S5 상단 사진에도 같은 주소를 쓴다.
 export function adaptRestaurants(raw) {
