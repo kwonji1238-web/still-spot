@@ -1,8 +1,8 @@
-// 부산 안인지 가리는 대략의 범위(남서·북동 모서리). 본인 위치가 이 안이면 안내 팝업을 띄우지 않는다.
-// TODO(열린 결정: 부산 범위) 행정구역 경계가 아니라 사각형 근사값이다.
+// 본인 위치가 부산 안인지 가리는 범위(남서·북동 모서리). 부산 행정구역 전체와 서비스 데이터가 놓인 곳을 모두 감싸는 사각형이다.
+// 서비스가 지도에 보여 주는 장소는 모두 이 안에 있고, 양산·울산·창원 접경 밖에서는 부산 안내 팝업이 뜬다.
 export const BUSAN_BOUNDS = { south: 34.88, west: 128.75, north: 35.40, east: 129.32 };
 
-// 확정 문구와 [제안]·열린 결정 값을 한 곳에 모은다. 바꿀 때는 이 파일만 고친다.
+// 확정 문구와 값을 한 곳에 모은다. 바꿀 때는 이 파일만 고친다.
 
 // 확정 문구 (DESIGN.md 6장 "화면별 문구")
 export const COPY = {
@@ -39,12 +39,13 @@ export const COPY = {
     '촬영지 정보는 부산광역시가 제공한 공공데이터를 바탕으로 합니다. 지도 위치는 주소를 변환한 값이라 실제와 다를 수 있습니다.',
   // TMDB 고지 원문(홈 맨 아래에만). 말투를 바꾸지 않는다. 포스터가 하나라도 있을 때만 보인다.
   tmdbCredit: '© TMDB - All movie-related data and images. (This product uses the TMDB API but is not endorsed or certified by TMDB.)',
-  // TODO(열린 결정: S5 출처 문구) 관광지·식당 데이터 제공처를 확인한 뒤 정한다. 비어 있으면 화면에 칸을 만들지 않는다.
-  placeSource: '',
-  // TODO(열린 결정: 토스트 문구와 표시 시간) 예시 문구라 확정이 아니다.
+  // 관광지·식당·카페 상세(S5)의 출처 문구. 촬영지 출처 문구와 같은 말투(원문 그대로 쓰는 문구)로 쓴다.
+  placeSource: '관광지·식당·카페 정보는 부산광역시가 제공한 공공데이터를 바탕으로 합니다.',
   copiedToast: '주소를 복사했어요',
-  // TODO(열린 결정: 오류 문구) 예시 문구라 확정이 아니다.
   loadError: '정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요',
+  // 지도 SDK를 못 불러왔을 때. 목록과 상세는 그대로 쓸 수 있고, 다시 시도하면 지도를 다시 불러온다.
+  mapFail: '지도를 불러오지 못했어요. 잠시 후 다시 시도해 주세요',
+  viewDetail: '상세보기',
   retry: '다시 시도',
   // "본인 위치" 버튼과 안내 팝업. 위치는 저장하지 않고 서버로 보내지 않는다. 부산 밖이면 부산으로 옮길지 묻고, 위치를 못 받으면 닫기만 있는 안내를 띄운다.
   // 안내 팝업은 지역명을 쓰는 예외다(화면 문구에는 지역명을 쓰지 않는 것이 원칙).
@@ -64,7 +65,7 @@ export const COPY = {
   sheetFold: '목록 접기',
   sheetUnfold: '목록 펼치기',
   fitWork: '이 작품의 촬영지 모두 보기',
-  // TODO(열린 결정: 테마 전환 버튼의 문구) DESIGN.md에 없는 안내 문구라 임시로 정했다. 아이콘 버튼의 접근성 이름으로만 쓴다.
+  // 테마 전환 버튼은 아이콘뿐이라 이 문구는 접근성 이름으로만 쓴다.
   themeToDark: '다크 모드로 전환',
   themeToLight: '라이트 모드로 전환',
 };
@@ -98,21 +99,27 @@ export const FEATURED = {
   ],
 };
 
-// TODO(열린 결정: 코스 후보 반경) docs/data-schema.md 6장의 반경별 채움 비율을 보고 정한다. 지금 값은 임시.
+// 근처 미리보기(S3)와 근처 장소 핀의 반경
 export const NEARBY_RADIUS_M = 3000;
 
 // 근처 미리보기(S3)와 근처 장소 핀(S2): 관광지 최대 2 + 식당 최대 1
 export const PREVIEW_LIMITS = { attraction: 2, restaurant: 1 };
-// 코스(S4): 관광지 최대 2 + 식당 최대 1 + 카페 최대 1
-export const COURSE_LIMITS = { attraction: 2, restaurant: 1, cafe: 1 };
-// TODO(열린 결정: 코스 표시 순서) 지금은 촬영지 → 관광지 → 식당 → 카페 순서를 쓴다. 가까운 순 정렬은 미정.
-export const COURSE_KIND_ORDER = ['spot', 'attraction', 'restaurant', 'cafe'];
 
-// TODO(열린 결정: OpenAI 대기 시간 기준) 정해진 값이 아니다. 넘으면 규칙 기반 코스로 대체한다.
-export const AI_TIMEOUT_MS = 9500; // 서버 함수의 대기 한도(netlify/functions/course.js, 8.5초)보다 길게 둔다
+// 코스(S4): 촬영지 → 관광지 → 카페. 촬영지 반경 5km에서 찾고, 관광지와 카페가 모두 없으면 8km, 12km로 넓힌다.
+export const COURSE_RADIUS_STEPS_M = [5000, 8000, 12000];
+// 코스에 넣는 최대 개수: 관광지 2 + 카페 1(촬영지까지 3~4곳)
+export const COURSE_LIMITS = { attraction: 2, cafe: 1 };
+// OpenAI가 고르는 후보 풀: 가까운 관광지 3 + 카페 3. 이 안에서 관광지 1~2 + 카페 1을 골라 순서를 정한다.
+export const COURSE_POOL_LIMITS = { attraction: 3, cafe: 3 };
+// 규칙 기반 코스의 종류 순서(같은 종류 안에서는 이어 가기 가까운 곳이 먼저)
+export const COURSE_KIND_ORDER = ['spot', 'attraction', 'cafe'];
+
+// OpenAI 응답을 기다리는 한도. 평균 응답 목표는 2~5초이고, 넘으면 규칙 기반 코스로 대체한다.
+// 서버 함수의 대기 한도(netlify/functions/course.js, 8.5초)보다 길게 둔다.
+export const AI_TIMEOUT_MS = 9500;
 
 // [제안] 토스트 표시 시간
 export const TOAST_MS = 2000;
 
 
-// TODO(열린 결정: 경로 지도 높이) 약 200px을 임시로 쓴다. src/styles.css의 --route-map-h와 같이 바꾼다.
+// 코스 경로 지도 높이는 약 200px이다. src/styles.css의 --route-map-h와 같이 바꾼다.

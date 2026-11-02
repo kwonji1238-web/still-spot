@@ -4,13 +4,15 @@ import { readFileSync, existsSync } from 'node:fs';
 import { buildIndex, adaptRestaurants, spotsAtSamePlace, stripLangNote, isClosedSpot } from '../src/data.js';
 import { searchWorks, searchSpots, normalize } from '../src/search.js';
 import { distanceM, formatDistance } from '../src/geo.js';
-import { previewCandidates, courseCandidates } from '../src/candidates.js';
-import { ruleCourse, validateAiCourse, cleanNote } from '../src/course.js';
+import { previewCandidates, courseCandidates, coursePool } from '../src/candidates.js';
+import { ruleCourse, ruleSummary, validateAiCourse, cleanNote, SUMMARY_MAX } from '../src/course.js';
 import { FEATURED } from '../src/settings.js';
 import { pickFeatured } from '../src/featured.js';
 import { slimRows, slimPosters } from '../scripts/slim.mjs';
 
 const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url)));
+// 촬영지 목록은 무작위 순서라, 두 결과를 비교하는 테스트에는 같은 값을 내는 난수 함수를 쓴다
+const seeded = () => { let x = 12345; return () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648); };
 const db = buildIndex({
   cinemap: read('cinemap.json'),
   attractions: read('attractions.json'),
@@ -138,7 +140,8 @@ const at = (id, kind, dLat) => ({ id, kind, name: id, lat: 35 + dLat, lng: 129 }
 const places = [
   at('a1', 'attraction', 0.003), at('a2', 'attraction', 0.001), at('a3', 'attraction', 0.002),
   at('r1', 'restaurant', 0.004), at('r2', 'restaurant', 0.0005),
-  at('c1', 'cafe', 0.001), at('far', 'attraction', 0.5),
+  at('c1', 'cafe', 0.001), at('c2', 'cafe', 0.004), at('c3', 'cafe', 0.005), at('c4', 'cafe', 0.006),
+  at('far', 'attraction', 0.5),
 ];
 
 test('후보: 미리보기는 관광지 2 + 식당 1, 가까운 순, 반경 밖 제외', () => {
@@ -146,32 +149,66 @@ test('후보: 미리보기는 관광지 2 + 식당 1, 가까운 순, 반경 밖 
   assert.deepEqual(ids, ['a2', 'a3', 'r2']);
 });
 
-test('후보: 코스는 카페 1까지, 모자라면 있는 것만', () => {
-  assert.deepEqual(courseCandidates(spot, places).map((c) => c.place.id), ['a2', 'a3', 'r2', 'c1']);
-  assert.deepEqual(courseCandidates(spot, [places[0]]).map((c) => c.place.id), ['a1']);
+const ids = (list) => list.map((c) => c.place.id);
+
+test('후보: 코스는 관광지 2 + 카페 1(식당 제외), 가까운 순', () => {
+  assert.deepEqual(ids(courseCandidates(spot, places)), ['a2', 'a3', 'c1']);
+  assert.deepEqual(ids(courseCandidates(spot, [places[0]])), ['a1']);
   assert.deepEqual(courseCandidates({ id: 'x', lat: null, lng: null }, places), []);
 });
 
-test('규칙 코스: 촬영지 → 관광지 → 식당 → 카페', () => {
-  const c = courseCandidates(spot, places);
-  const kinds = ruleCourse(spot, [...c].reverse()).map((i) => i.place.kind ?? 'spot');
-  assert.deepEqual(kinds, ['spot', 'attraction', 'attraction', 'restaurant', 'cafe']);
+test('후보: 코스 반경은 5km에서 시작하고, 관광지·카페가 모두 모일 때까지 8km, 12km로 넓힌다', () => {
+  const km = (n) => n / 111.2; // 위도 1도 ≈ 111.2km
+  // 5km 안에 관광지만 있고 카페는 6km 거리 → 8km로 넓혀 카페까지 모은다
+  assert.deepEqual(ids(courseCandidates(spot, [at('a', 'attraction', km(3)), at('c', 'cafe', km(6))])), ['a', 'c']);
+  // 카페가 10km 거리 → 12km까지 넓혀서 찾는다
+  assert.deepEqual(ids(courseCandidates(spot, [at('a', 'attraction', km(3)), at('c', 'cafe', km(10))])), ['a', 'c']);
+  // 카페가 20km 거리 → 12km 안에 없으니 관광지만
+  assert.deepEqual(ids(courseCandidates(spot, [at('a', 'attraction', km(3)), at('c', 'cafe', km(20))])), ['a']);
+  // 5km 안에 둘 다 있으면 넓히지 않는다(5km 밖의 가까운 관광지는 섞이지 않음)
+  assert.deepEqual(ids(courseCandidates(spot, [at('a', 'attraction', km(3)), at('c', 'cafe', km(4)), at('b', 'attraction', km(7))])), ['a', 'c']);
 });
 
-test('AI 검증: 후보와 같은 집합이면 통과, 촬영지는 맨 앞', () => {
-  const c = courseCandidates(spot, places);
-  const ok = validateAiCourse(spot, c, { order: ['c1', 'r2', 'a3', 'a2'], notes: { c1: '쉬어 가기 좋아요' } });
-  assert.deepEqual(ok.items.map((i) => i.place.id), ['s', 'c1', 'r2', 'a3', 'a2']);
-  assert.equal(ok.items[1].note, '쉬어 가기 좋아요');
+test('후보: OpenAI 풀은 관광지 3 + 카페 3이고 코스 후보를 모두 포함한다', () => {
+  const pool = ids(coursePool(spot, places));
+  assert.deepEqual(pool, ['a2', 'a3', 'a1', 'c1', 'c2', 'c3']);
+  assert.ok(ids(courseCandidates(spot, places)).every((id) => pool.includes(id)));
 });
 
-test('AI 검증: 지어낸 장소·빠짐·중복·모양 오류는 거절', () => {
+test('규칙 코스: 촬영지 → 관광지 → 카페, 같은 종류는 이어 가기 가까운 곳부터', () => {
   const c = courseCandidates(spot, places);
-  assert.equal(validateAiCourse(spot, c, { order: ['a2', 'a3', 'r2', 'made-up'] }), null);
-  assert.equal(validateAiCourse(spot, c, { order: ['a2', 'a3', 'r2'] }), null);
-  assert.equal(validateAiCourse(spot, c, { order: ['a2', 'a2', 'r2', 'c1'] }), null);
-  assert.equal(validateAiCourse(spot, c, { order: 'a2' }), null);
-  assert.equal(validateAiCourse(spot, c, null), null);
+  const r = ruleCourse(spot, [...c].reverse());
+  assert.deepEqual(r.map((i) => i.place.kind), ['spot', 'attraction', 'attraction', 'cafe']);
+  assert.deepEqual(ids(r), ['s', 'a2', 'a3', 'c1']);
+  // 남쪽 B(111m)와 북쪽 A(333m): 가까운 B를 먼저 들러야 되돌아가는 길이 짧다
+  const B = { place: at('B', 'attraction', -0.001), distance: 111 };
+  const A = { place: at('A', 'attraction', 0.003), distance: 333 };
+  assert.deepEqual(ids(ruleCourse(spot, [A, B])), ['s', 'B', 'A']);
+});
+
+test('AI 검증: 풀 안에서 고른 코스는 통과, 촬영지는 맨 앞', () => {
+  const pool = coursePool(spot, places);
+  const ok = validateAiCourse(spot, pool, { order: ['a3', 'c2', 'a1'], notes: { c2: '쉬어 가기 좋아요' } });
+  assert.deepEqual(ids(ok.items), ['s', 'a3', 'c2', 'a1']);
+  assert.equal(ok.items[2].note, '쉬어 가기 좋아요');
+  assert.deepEqual(ids(validateAiCourse(spot, pool, { order: ['s', 'a2', 'c1'] }).items), ['s', 'a2', 'c1']);
+});
+
+test('AI 검증: 지어낸 장소·중복·종류별 개수 초과·종류 빠짐·모양 오류는 거절', () => {
+  const pool = coursePool(spot, places);
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'made-up', 'c1'] }), null);
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'a2', 'c1'] }), null);
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'a3', 'a1', 'c1'] }), null, '관광지는 2곳까지');
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'c1', 'c2'] }), null, '카페는 1곳까지');
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'a3'] }), null, '풀에 카페가 있으면 카페 포함');
+  assert.equal(validateAiCourse(spot, pool, { order: ['c1'] }), null, '풀에 관광지가 있으면 관광지 포함');
+  assert.equal(validateAiCourse(spot, [...pool, { place: places.find((p) => p.id === 'r2'), distance: 55 }], { order: ['a2', 'r2', 'c1'] }), null, '식당은 코스에 넣지 않음');
+  assert.equal(validateAiCourse(spot, pool, { order: [] }), null);
+  assert.equal(validateAiCourse(spot, pool, { order: 'a2' }), null);
+  assert.equal(validateAiCourse(spot, pool, null), null);
+  // 풀에 관광지만 있으면 관광지만 골라도 통과
+  const onlyAttr = coursePool(spot, [places[0], places[1]]);
+  assert.deepEqual(ids(validateAiCourse(spot, onlyAttr, { order: ['a2'] }).items), ['s', 'a2']);
 });
 
 test('AI 설명: 느낌표·이모지·지역명·너무 긴 글은 버림', () => {
@@ -238,15 +275,61 @@ test('폐업: 이름 앞에 [폐업]·[페업]이 붙은 촬영지는 내지 않
 
 test('배포용 데이터: 줄인 사본으로 만든 결과가 원본으로 만든 결과와 같다', () => {
   const posters = read('posters.json');
-  const full = buildIndex({ cinemap: read('cinemap.json'), attractions: read('attractions.json'), restaurants: read('restaurants.json'), posters, scenes: read('scenes.json') });
+  const full = buildIndex({ cinemap: read('cinemap.json'), attractions: read('attractions.json'), restaurants: read('restaurants.json'), posters, scenes: read('scenes.json'), rand: seeded() });
   const slim = buildIndex({
     cinemap: slimRows(read('cinemap.json'), 'cinemap'),
     attractions: slimRows(read('attractions.json'), 'attractions'),
     restaurants: slimRows(read('restaurants.json'), 'restaurants'),
     posters: slimPosters(posters),
     scenes: read('scenes.json'),
+    rand: seeded(),
   });
   assert.deepEqual(slim.spots, full.spots);
   assert.deepEqual(slim.places, full.places);
   assert.deepEqual(slim.works.map((w) => [w.title, w.poster, w.info]), full.works.map((w) => [w.title, w.poster, w.info]));
+});
+
+test('후보: 촬영지와 같은 이름의 장소는 빼고, 같은 이름은 가까운 하나만', () => {
+  const spotN = { id: 's', kind: 'spot', name: '광안리 해수욕장', lat: 35, lng: 129 };
+  const named = (id, kind, name, dLat) => ({ id, kind, name, lat: 35 + dLat, lng: 129 });
+  const list = [
+    named('a1', 'attraction', '광안리해수욕장', 0.0005), // 촬영지 자신(띄어쓰기만 다름)
+    named('a2', 'attraction', '광안리 골방', 0.004),
+    named('c1', 'cafe', '베르크로스터스', 0.01),
+    named('c2', 'cafe', '베르크로스터스', 0.011), // 같은 이름은 먼 쪽을 뺀다
+    named('c3', 'cafe', '블랙업커피', 0.012),
+  ];
+  assert.deepEqual(ids(courseCandidates(spotN, list)), ['a2', 'c1']);
+  assert.deepEqual(ids(previewCandidates(spotN, list)), ['a2']);
+  assert.deepEqual(ids(coursePool(spotN, list)), ['a2', 'c1', 'c3']);
+});
+
+test('코스 한 줄 요약: AI 요약은 40자 이내·문구 규칙을 지킬 때만 쓰고, 아니면 종류로 만든 문장을 쓴다', () => {
+  const pool = coursePool(spot, places);
+  const ok = validateAiCourse(spot, pool, { order: ['a2', 'c1'], summary: '조선통신사 이야기를 보고, 카페에서 쉬어가요' });
+  assert.equal(ok.summary, '조선통신사 이야기를 보고, 카페에서 쉬어가요');
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'c1'], summary: '가'.repeat(SUMMARY_MAX + 1) }).summary, null);
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'c1'], summary: '부산의 전망을 보고 쉬어가요' }).summary, null);
+  assert.equal(validateAiCourse(spot, pool, { order: ['a2', 'c1'], summary: '좋은 코스예요!' }).summary, null);
+  const kind = (k) => ({ place: { kind: k } });
+  assert.equal(ruleSummary([kind('spot'), kind('attraction'), kind('cafe')]), '근처 관광지를 둘러보고, 카페에서 쉬어가요');
+  assert.equal(ruleSummary([kind('spot'), kind('attraction')]), '근처 관광지를 둘러봐요');
+  assert.equal(ruleSummary([kind('spot'), kind('cafe')]), '근처 카페에서 쉬어가요');
+  assert.equal(ruleSummary([kind('spot')]), null);
+  assert.ok([ruleSummary([kind('attraction'), kind('cafe')])].every((t) => t.length <= SUMMARY_MAX && !t.includes('!')));
+});
+
+test('촬영지 목록: 좌표 있는 촬영지는 무작위 순서(번호는 그 순서대로), 좌표 없는 촬영지는 번호 없이 맨 뒤', () => {
+  const sorted = buildIndex({ cinemap: read('cinemap.json'), attractions: [], restaurants: [], rand: () => 0.999 });
+  const shuffled = buildIndex({ cinemap: read('cinemap.json'), attractions: [], restaurants: [], rand: seeded() });
+  const again = buildIndex({ cinemap: read('cinemap.json'), attractions: [], restaurants: [], rand: seeded() });
+  const order = (idx) => idx.works.map((w) => w.spots.map((s) => s.id).join(',')).join('|');
+  assert.notEqual(order(sorted), order(shuffled), '섞이지 않았다');
+  assert.equal(order(shuffled), order(again), '같은 난수면 같은 순서');
+  for (const w of shuffled.works) {
+    const withNo = w.spots.filter((s) => s.no !== null);
+    withNo.forEach((s, i) => assert.equal(s.no, i + 1));
+    assert.ok(w.spots.slice(withNo.length).every((s) => s.lat === null && s.no === null));
+    assert.deepEqual([...w.spots.map((s) => s.id)].sort(), [...sorted.works.find((x) => x.title === w.title).spots.map((s) => s.id)].sort(), '촬영지가 빠지거나 늘지 않았다');
+  }
 });

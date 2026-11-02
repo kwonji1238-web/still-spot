@@ -63,6 +63,9 @@ const source = () => `<p class="source">${esc(COPY.source)}</p>`;
 const topBrand = () =>
   `<header class="home-top"><button class="brand-lock" type="button" data-action="home" aria-label="${esc(COPY.goHome)}">${logoMark()}<span class="wordmark" lang="en">${esc(COPY.wordmark)}</span></button>${themeButton()}</header>`;
 const backBtn = () => `<button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button>`;
+// 지도 SDK를 못 불러왔을 때의 안내(오류 안내 모양) + 다시 시도 버튼
+export const mapFailNotice = () =>
+  `<div class="notice is-error" id="map-fail" role="alert">${icon.warn()}<p>${esc(COPY.mapFail)}</p><button class="btn-text" type="button" data-action="retry-map">${esc(COPY.retry)}</button></div>`;
 const chev = () => `<span class="chev">${icon.chev()}</span>`;
 
 // ── S1·E1·E2 ──
@@ -326,21 +329,25 @@ export function frameMsg(state) {
   return `<div class="frame-msg framed is-${state}" role="status">${corners(12)}<span>${esc(text)}</span></div>`;
 }
 
-export function courseBody(course, { showRouteMap }) {
+export function courseBody(course, { showRouteMap, mapFailed = false }) {
   const items = course.items;
-  const summary = course.summary ? `<p class="t-sub c-sub">${esc(course.summary)}</p>` : '';
-  const routeMap = showRouteMap ? `<div class="route-map" id="route-map" aria-hidden="true"></div>` : '';
+  // 지도 바로 위의 한 줄 요약(Body 700)
+  const summary = course.summary ? `<p class="t-body t-strong course-summary">${esc(course.summary)}</p>` : '';
+  // 지도가 안 되면 경로 지도 자리에 안내를 두고, 카드에는 주소와 상세보기를 더해 목록만으로 둘러볼 수 있게 한다.
+  const routeMap = showRouteMap ? `<div class="route-map" id="route-map" aria-hidden="true"></div>` : mapFailed ? mapFailNotice() : '';
+  const addr = (p) => (mapFailed ? `<span class="t-sub c-sub">${esc(p.address)}</span>` : '');
+  const more = mapFailed ? `<span class="t-sub t-strong">${esc(COPY.viewDetail)}</span>` : '';
   const cards = items
     .map((it, i) => {
       const p = it.place;
       const note = it.note ? `<span class="t-sub c-sub">${esc(it.note)}</span>` : '';
       const body =
         p.kind === 'spot'
-          ? `<span class="grow"><span class="chip-kind">${KIND_LABEL.spot}</span><span class="t-strong clamp2">${esc(p.name)}</span><span class="t-sub c-sub">${esc(p.work)}</span>${note}</span>`
+          ? `<span class="grow"><span class="chip-kind">${KIND_LABEL.spot}</span><span class="t-strong clamp2">${esc(p.name)}</span><span class="t-sub c-sub">${esc(p.work)}</span>${addr(p)}${note}</span>`
           : `${thumbTile(p)}
-             <span class="grow"><span class="chip-kind">${KIND_LABEL[p.kind]}</span><span class="t-strong clamp2">${esc(p.name)}</span><span class="t-sub">직선 ${dist(it.distance)}</span>${note}</span>`;
+             <span class="grow"><span class="chip-kind">${KIND_LABEL[p.kind]}</span><span class="t-strong clamp2">${esc(p.name)}</span><span class="t-sub">직선 ${dist(it.distance)}</span>${addr(p)}${note}</span>`;
       const action = p.kind === 'spot' ? `data-action="open-spot" data-id="${p.id}"` : `data-action="open-place" data-id="${p.id}"`;
-      return `<li>${numBadge(i + 1)}<button class="card" ${action}><span class="sr-only">${i + 1}번 </span>${body}${chev()}</button></li>`;
+      return `<li>${numBadge(i + 1)}<button class="card" ${action}><span class="sr-only">${i + 1}번 </span>${body}${more}${chev()}</button></li>`;
     })
     .join('');
   return `<div class="stack-12">${summary}${routeMap}<ol class="timeline">${cards}</ol></div>`;
@@ -360,8 +367,7 @@ export function placeScreen(place, { spot, distance, canMap = false, pc = false 
   const intro = place.intro
     ? `<section class="stack-8"><h2 class="section-title">${esc(COPY.intro)}</h2><p class="clamp4" data-expand aria-expanded="false">${esc(place.intro)}</p></section>`
     : '';
-  // TODO(열린 결정: S5 출처 문구) COPY.placeSource가 비어 있으면 칸을 만들지 않는다.
-  const src = COPY.placeSource ? `<p class="source">${esc(COPY.placeSource)}</p>` : '';
+  const src = `<p class="source">${esc(COPY.placeSource)}</p>`;
   return `<article class="page">
     ${bar}
     ${top}

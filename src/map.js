@@ -2,6 +2,8 @@
 // 지도는 라이트·다크 모두 기본(밝은) 타일로 둔다.
 
 import { corners, esc, icon } from './render.js';
+import { KIND_LABEL } from './settings.js';
+import { formatDistance } from './geo.js';
 
 const SDK_TIMEOUT_MS = 8000;
 const CLUSTER_CELL_PX = 60;
@@ -34,6 +36,13 @@ export function loadKakao(key) {
   return sdkPromise;
 }
 
+// SDK를 못 불러왔을 때 다시 불러온다. 실패한 스크립트를 치우고 처음부터 시도한다.
+export function retryKakao(key) {
+  sdkPromise = null;
+  document.querySelectorAll('script[src*="dapi.kakao.com"]').forEach((el) => el.remove());
+  return loadKakao(key);
+}
+
 const ll = (p) => new kakao.maps.LatLng(p.lat, p.lng);
 
 function boundsOf(points) {
@@ -47,7 +56,7 @@ function boundsOf(points) {
   return b;
 }
 
-function pinEl({ no, selected, label, nearby, all, cluster, clickable, tier, kind }) {
+function pinEl({ no, selected, label, nearby, all, cluster, clickable, tier, kind, noLabel }) {
   // 식당·카페 핀은 사각 프레임(꺾쇠) 대신 종류를 알려 주는 아이콘을 넣는다
   const glyph = nearby && (kind === 'restaurant' || kind === 'cafe') ? icon[kind === 'cafe' ? 'cafe' : 'food']() : '';
   const tag = clickable ? 'button' : 'div';
@@ -59,7 +68,7 @@ function pinEl({ no, selected, label, nearby, all, cluster, clickable, tier, kin
   el.className = 'pin-wrap';
   el.innerHTML =
     `<${tag} class="${cls}"${aria}>${glyph || (tier === 'far' && all ? '' : corners(size, 1.5))}${no != null ? `<span>${no}</span>` : ''}${cluster != null ? `<span>${cluster.toLocaleString('ko-KR')}</span>` : ''}</${tag}>` +
-    (label && (selected || nearby || (all && tier === 'near')) ? `<span class="pin-label">${esc(label)}</span>` : '');
+    (label && !noLabel && (selected || nearby || (all && tier === 'near')) ? `<span class="pin-label">${esc(label)}</span>` : '');
   return el;
 }
 
@@ -72,7 +81,24 @@ export class MainMap {
     this.all = null; // 첫 화면의 전체 촬영지 핀(묶음 계산 대상)
     this.allListener = null;
     this.onMapClick = null; // 지도의 빈 곳을 눌렀을 때(핀·묶음은 해당 없음)
-    kakao.maps.event.addListener(this.map, 'click', () => this.onMapClick?.());
+    // 사용자가 직접 끌거나 확대·축소했는지. 그랬다면 핀을 눌러 선택할 때 지도를 자동으로 맞추지 않는다.
+    // 우리가 지도를 맞춘 직후 잠깐은 그 움직임을 사용자 조작으로 세지 않는다.
+    this.userMoved = false;
+    this.lockUntil = 0;
+    const touched = () => { if (Date.now() > this.lockUntil) this.userMoved = true; };
+    kakao.maps.event.addListener(this.map, 'dragstart', touched);
+    kakao.maps.event.addListener(this.map, 'zoom_start', touched);
+    this.course = null; // PC 메인 지도에 그리는 코스 { items }
+    this.courseListener = null;
+    this.selectedCourse = null; // 정보창을 연 코스 핀의 번호(1부터)
+    this.info = null;
+    kakao.maps.event.addListener(this.map, 'click', () => { this.closeInfo(); this.onMapClick?.(); });
+  }
+
+  // 우리가 지도를 움직일 때 호출한다. reset이면 자동 맞춤을 다시 켠다(새로 맞춘 화면에서 다시 시작).
+  _prog(reset) {
+    this.lockUntil = Date.now() + 700;
+    if (reset) this.userMoved = false;
   }
 
   relayout() { this.map.relayout(); }
@@ -81,7 +107,12 @@ export class MainMap {
     if (layer === 'spots') this.all = null;
     this.layers[layer].forEach((o) => o.setMap(null));
     this.layers[layer] = [];
-    if (layer === 'course' && this.line) { this.line.setMap(null); this.line = null; }
+    if (layer === 'course') {
+      if (this.line) { this.line.setMap(null); this.line = null; }
+      this.course = null;
+      this.selectedCourse = null;
+      this.closeInfo();
+    }
   }
 
   add(layer, place, opts, onClick) {
@@ -89,7 +120,7 @@ export class MainMap {
     if (onClick) el.querySelector('.pin').addEventListener('click', onClick);
     const o = new kakao.maps.CustomOverlay({
       position: ll(place), content: el, xAnchor: 0.5, yAnchor: 0.5, clickable: !!onClick,
-      zIndex: opts.selected ? 3 : opts.nearby ? 1 : 2,
+      zIndex: opts.z ?? (opts.selected ? 3 : opts.nearby ? 1 : 2),
     });
     o.setMap(this.map);
     this.layers[layer].push(o);
@@ -194,10 +225,109 @@ export class MainMap {
     }
   }
 
-  // 코스 번호 핀과 순서대로 이은 직선 (PC 메인 지도)
+  // PC 메인 지도의 코스: 번호 핀과 순서대로 이은 직선.
+  // 겹치는 핀은 화면에서 가까운 것끼리 개수 하나로 묶고(확대하면 풀린다), 같은 좌표의 핀은 둘레로 벌려 놓는다.
+  // 코스 핀은 다른 핀보다 위에 보이고, 누른 핀은 맨 위로 올라와 정보창(장소명 · 분류 · 직선 거리)을 연다.
   setCourse(items) {
     this.clear('course');
-    drawCourse(this, items);
+    const list = items.filter((it) => it.place.lat !== null);
+    this.course = { items: list };
+    if (!this.courseListener) {
+      this.courseListener = () => this.drawCourseLayer();
+      kakao.maps.event.addListener(this.map, 'idle', this.courseListener);
+    }
+    this.drawCourseLayer();
+    if (list.length > 1) {
+      // 코스 경로선: 1px 직선, 지도 고정 색
+      this.line = new kakao.maps.Polyline({
+        path: list.map((it) => ll(it.place)), strokeWeight: 1, strokeColor: '#1A1917', strokeOpacity: 1, strokeStyle: 'solid',
+      });
+      this.line.setMap(this.map);
+    }
+  }
+
+  drawCourseLayer() {
+    if (!this.course) return;
+    const w = this.el.clientWidth, h = this.el.clientHeight;
+    if (!w || !h) return;
+    this.layers.course.forEach((o) => o.setMap(null));
+    this.layers.course = [];
+    const proj = this.map.getProjection();
+    const toLatLng = (x, y) => {
+      const c = proj.coordsFromContainerPoint(new kakao.maps.Point(x, y));
+      return { lat: c.getLat(), lng: c.getLng() };
+    };
+    // 1) 같은 좌표의 코스 장소를 한 자리로 모은다
+    const spots = new Map();
+    this.course.items.forEach((it, i) => {
+      const k = `${it.place.lat.toFixed(5)},${it.place.lng.toFixed(5)}`;
+      if (!spots.has(k)) {
+        const pt = proj.containerPointFromCoords(ll(it.place));
+        spots.set(k, { x: pt.x, y: pt.y, members: [] });
+      }
+      spots.get(k).members.push({ it, no: i + 1 });
+    });
+    // 2) 화면에서 가까운 자리끼리 묶는다(핀 24px 안에 들어오면 겹친다고 본다)
+    const groups = [];
+    for (const sp of spots.values()) {
+      const g = groups.find((c) => Math.hypot(c.x - sp.x, c.y - sp.y) < 28);
+      if (g) {
+        g.spots.push(sp);
+        g.x = g.spots.reduce((a, s) => a + s.x, 0) / g.spots.length;
+        g.y = g.spots.reduce((a, s) => a + s.y, 0) / g.spots.length;
+      } else groups.push({ x: sp.x, y: sp.y, spots: [sp] });
+    }
+    let selectedAt = null;
+    for (const g of groups) {
+      const members = g.spots.flatMap((s) => s.members);
+      if (g.spots.length > 1) {
+        // 가까운 서로 다른 장소들: 개수 하나로 묶는다. 누르면 그 장소들이 모두 보이게 확대한다.
+        this.add('course', toLatLng(g.x, g.y), { cluster: members.length, clickable: true, z: 5 }, () => this.zoomTo(members.map((m) => m.it.place)));
+        continue;
+      }
+      // 같은 좌표(또는 한 장소): 둘 이상이면 둘레로 벌려 겹침을 줄인다
+      members.forEach((m, j) => {
+        let x = g.x, y = g.y;
+        if (members.length > 1) {
+          const angle = (2 * Math.PI * j) / members.length - Math.PI / 2;
+          x += Math.cos(angle) * 18;
+          y += Math.sin(angle) * 18;
+        }
+        const pos = members.length > 1 ? toLatLng(x, y) : m.it.place;
+        const selected = this.selectedCourse === m.no;
+        if (selected) selectedAt = { pos, item: m.it };
+        this.add('course', pos, { no: m.no, selected, noLabel: true, label: m.it.place.name, clickable: true, z: selected ? 100 : 5 }, () => this.selectCourse(m.no));
+      });
+    }
+    if (selectedAt) this.showInfo(selectedAt.pos, selectedAt.item);
+    else this.closeInfo(false);
+  }
+
+  // 코스 핀을 누르면 그 핀을 맨 위로 올리고 정보창을 연다. 같은 핀을 다시 누르면 닫는다.
+  selectCourse(no) {
+    this.selectedCourse = this.selectedCourse === no ? null : no;
+    this.drawCourseLayer();
+  }
+
+  showInfo(pos, item) {
+    this.info?.setMap(null);
+    const p = item.place;
+    const d = item.distance > 0 ? formatDistance(item.distance) : null;
+    const el = document.createElement('div');
+    el.className = 'map-info-wrap';
+    el.innerHTML = `<div class="map-info" role="status"><p class="map-info-name">${esc(p.name)}</p><p class="map-info-sub">${esc(KIND_LABEL[p.kind] || '')}${d ? ` · 직선 <span class="num">${d.value}</span>${d.unit}` : ''}</p></div>`;
+    this.info = new kakao.maps.CustomOverlay({ position: ll(pos), content: el, xAnchor: 0.5, yAnchor: 1, zIndex: 101 });
+    this.info.setMap(this.map);
+  }
+
+  // redraw=false면 선택 상태는 두고 정보창만 치운다(다시 그리는 중에 쓴다)
+  closeInfo(redraw = true) {
+    this.info?.setMap(null);
+    this.info = null;
+    if (redraw && this.selectedCourse !== null) {
+      this.selectedCourse = null;
+      this.drawCourseLayer();
+    }
   }
 
   // 이 장소를 선택 핀(이름표 포함)으로 띄운다. 근처 장소 핀 자리를 쓴다.
@@ -209,11 +339,13 @@ export class MainMap {
   // padding: [top, right, bottom, left] px
   fit(points, padding = [40, 40, 40, 40]) {
     if (!points.length) return;
+    this._prog(true);
     this.map.setBounds(boundsOf(points), ...padding);
   }
 
   // 한 곳으로 확대한다. padding은 fit과 같은 [위, 오른쪽, 아래, 왼쪽]이고, 시트에 가리지 않는 가운데에 핀을 둔다.
   focus(place, level, padding = [0, 0, 0, 0]) {
+    this._prog(true);
     this.map.setLevel(level);
     this.map.setCenter(ll(place));
     // 핀이 놓일 화면 위치(가려지지 않는 영역의 가운데)와 정반대 지점을 지도 중심으로 삼는다
@@ -237,6 +369,7 @@ export class MainMap {
   }
 
   restoreCarried(v) {
+    this._prog(false);
     this.map.setLevel(v.level);
     this.map.setCenter(new kakao.maps.LatLng(v.lat, v.lng));
     const r = this.el.getBoundingClientRect();
@@ -246,6 +379,7 @@ export class MainMap {
   }
 
   setView(v) {
+    this._prog(false);
     this.map.setLevel(v.level);
     this.map.setCenter(new kakao.maps.LatLng(v.lat, v.lng));
   }
@@ -259,7 +393,7 @@ function drawCourse(target, items) {
   });
   // 핀이 하나뿐이면 선 없이 핀만
   if (pts.length > 1) {
-    // TODO(열린 결정: 코스 경로선의 색·굵기) 지금은 1px 직선에 지도 고정 색을 쓴다.
+    // 코스 경로선: 1px 직선, 지도 고정 색
     target.line = new kakao.maps.Polyline({
       path: pts.map(ll), strokeWeight: 1, strokeColor: '#1A1917', strokeOpacity: 1, strokeStyle: 'solid',
     });

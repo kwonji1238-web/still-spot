@@ -84,9 +84,18 @@ export function adaptRestaurants(raw) {
     .filter((p) => p.lat !== null && p.lng !== null);
 }
 
-// 작품 목록: 작품명 → 촬영지 배열. 촬영지 순서는 원본 순서를 지키고 좌표 없는 곳은 맨 뒤.
-// TODO(열린 결정: 촬영지 목록 정렬 기준) 지금은 원본 순서.
-export function buildWorks(spots) {
+// 작품 목록: 작품명 → 촬영지 배열. 좌표 있는 촬영지는 무작위 순서로 두고(데이터를 불러올 때마다 한 번 섞는다), 번호는 그 순서대로 매긴다.
+// 좌표 없는 촬영지는 번호 없이 맨 뒤에 둔다.
+const shuffle = (list, rand) => {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+export function buildWorks(spots, rand = Math.random) {
   const map = new Map();
   for (const s of spots) {
     if (!s.work) continue;
@@ -95,7 +104,7 @@ export function buildWorks(spots) {
   }
   const works = [];
   for (const [title, list] of map) {
-    const withCoords = list.filter((s) => s.lat !== null);
+    const withCoords = shuffle(list.filter((s) => s.lat !== null), rand);
     const without = list.filter((s) => s.lat === null);
     withCoords.forEach((s, i) => (s.no = i + 1));
     without.forEach((s) => (s.no = null));
@@ -116,7 +125,7 @@ export function spotsAtSamePlace(spot, spots) {
 
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w185';
 
-export function buildIndex({ cinemap, attractions, restaurants, posters = {}, scenes = {} }) {
+export function buildIndex({ cinemap, attractions, restaurants, posters = {}, scenes = {}, rand = Math.random }) {
   const spots = adaptSpots(cinemap);
   // 장면 설명은 data/scenes.json("작품명|장소명" → 글)에 있는 촬영지에만 붙는다. 없으면 그 줄이 화면에서 빠진다.
   for (const s of spots) {
@@ -126,7 +135,7 @@ export function buildIndex({ cinemap, attractions, restaurants, posters = {}, sc
     const sp = SPOT_PHOTOS[s.name];
     s.photos = sp?.images || (sp?.image ? [sp.image] : []);
   }
-  const works = buildWorks(spots);
+  const works = buildWorks(spots, rand);
   // 포스터는 data/posters.json(scripts/posters.mjs가 만든다)에 있는 작품만 붙는다. 없으면 빈 프레임.
   // 개봉연도·장르는 있는 값만 붙고, 없으면 그 줄이 화면에서 빠진다. 줄거리·출연진은 화면에서 쓰지 않는다.
   for (const w of works) {

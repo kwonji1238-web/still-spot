@@ -4,14 +4,14 @@
 
 import { loadData, spotsAtSamePlace } from './data.js';
 import { searchWorks, searchSpots } from './search.js';
-import { previewCandidates, courseCandidates } from './candidates.js';
-import { ruleCourse } from './course.js';
+import { previewCandidates, courseCandidates, coursePool } from './candidates.js';
+import { ruleCourse, ruleSummary } from './course.js';
 import { fetchAiCourse } from './api.js';
 import { distanceM } from './geo.js';
 import { TOAST_MS, COPY, BUSAN_BOUNDS } from './settings.js';
 import { pickFeatured } from './featured.js';
 import * as R from './render.js';
-import { loadKakao, MainMap, createRouteMap } from './map.js';
+import { loadKakao, retryKakao, MainMap, createRouteMap } from './map.js';
 import { toggleTheme } from './theme.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -63,6 +63,9 @@ const href = {
 function mapVisible() {
   return document.body.dataset.map === 'on' && app.main;
 }
+
+// 사용자가 지도를 직접 끌거나 확대·축소했는가. 그랬다면 핀을 눌러 선택할 때 지도를 자동으로 맞추지 않는다.
+const userMovedMap = () => !!(mapVisible() && app.main.userMoved);
 
 function saveState() {
   const st = { ...(history.state || {}) };
@@ -123,6 +126,7 @@ function render(fresh) {
 
   if (layout === 'pc') renderPc(r, ctx, st);
   else renderMobile(r, ctx, st);
+  showMapFailNotice();
   app.keepView = false;
   app.fitWorkOnce = false;
   if (r.name !== 'place') app.placeFocused = false;
@@ -188,6 +192,7 @@ function syncHomeMode() {
   home.classList.toggle('is-searching', (app.searching && !panel) || noMap);
   home.classList.toggle('is-panel', panel);
   home.classList.toggle('no-map', noMap);
+  if (noMap) showMapFailNotice();
   document.body.classList.toggle('is-searching', home.classList.contains('is-searching'));
 }
 
@@ -212,7 +217,7 @@ function drawHomeMap(st) {
 
 // 핀을 누르면 그 작품의 지도 화면(S2)에서 이 핀을 선택한 상태로 열고, PC는 상세 패널을 연다.
 function pickHomePin(spot) {
-  app.keepView = true; // 핀을 눌러 들어올 때는 시트만 올라오고 지도는 그 자리에 둔다
+  app.keepView = userMovedMap(); // 지도를 직접 움직였다면 그 자리에 두고, 아니면 촬영지와 근처 후보가 보이게 맞춘다
   navigate(document.body.dataset.layout === 'pc' ? href.spot(spot.id) : href.work(spot.work, spot.id));
 }
 
@@ -413,8 +418,8 @@ function fitWork(work) {
   app.main.fit(work.spots.filter((s) => s.lat !== null), mapPadding());
 }
 
-// 선택한 촬영지와 근처 장소 핀이 함께 보이게 [제안]
-// TODO(열린 결정: 근처 핀이 보이게 확대할지) 대안은 확대 수준 유지.
+// 선택한 촬영지와 근처 장소 핀(관광지·식당)이 모두 보이게 지도 범위를 맞춘다. 기본으로 켜져 있고,
+// 사용자가 지도를 직접 끌거나 확대·축소하면 핀을 눌러 선택할 때는 맞추지 않는다(userMovedMap).
 function fitSelection() {
   const sel = app.db.byId.get(app.selectedId);
   if (!sel || sel.lat === null) return;
@@ -450,7 +455,7 @@ function pickSpot(id) {
   // 이미 선택된 핀을 한 번 더 누르면 선택이 풀린다
   if (id === app.selectedId && (app.route.name === 'work' || app.route.name === 'spot')) return deselectSpot();
   if (document.body.dataset.layout === 'pc' || app.route.name === 'spot') {
-    app.keepView = true; // 핀을 눌러 선택할 때는 지도를 움직이지 않는다
+    app.keepView = app.placeFocused || userMovedMap(); // 지도를 직접 움직였다면 그 자리에 둔다
     return navigate(href.spot(id));
   }
   app.selectedId = id;
@@ -460,13 +465,13 @@ function pickSpot(id) {
   scrollRowIntoView(id);
   const work = app.db.workByTitle.get(app.db.byId.get(id).work);
   drawWorkPins(work);
-  // 핀을 눌렀을 때는 지도를 움직이지 않고 시트만 올린다. 펼침 시트는 지도가 보이게 반 열림으로 내린다.
+  // 펼침 시트는 지도가 보이게 반 열림으로 내린다. 지도를 직접 움직이지 않았다면 촬영지와 근처 후보가 모두 보이게 맞춘다.
   if (app.sheetLevel === 'expanded') setSheetLevel('half', false);
+  if (!userMovedMap()) fitSelection();
   saveState();
 }
 
-// 장소 상세의 "지도로 보기"가 그 장소로 확대할 때 쓰는 카카오 지도 레벨
-// TODO(열린 결정: 확대 수준) 지금은 카카오 레벨 4.
+// 장소 상세의 "지도로 보기"가 그 장소로 확대할 때 쓰는 카카오 지도 레벨(4)
 const FOCUS_LEVEL = 4;
 
 // 목록에서 선택한 줄 표시(촬영지 줄은 li.row-split 전체에 걸린다)
@@ -559,18 +564,20 @@ async function runCourse(spot, pc, keepView = false) {
   if (!course) {
     const cands = courseCandidates(spot, app.db.places);
     status.innerHTML = R.frameMsg('loading'); // OpenAI 설명을 기다리는 동안만
-    const ai = await fetchAiCourse(spot, cands);
+    const ai = await fetchAiCourse(spot, coursePool(spot, app.db.places));
     course = ai || { items: ruleCourse(spot, cands), summary: null };
+    course.summary ||= ruleSummary(course.items); // AI 요약이 없거나 버려졌을 때도 한 줄은 보인다
     app.courses.set(spot.id, course);
     if (token !== app.token) return;
   }
   // 순서가 정해진 뒤에 카드 번호·경로 지도를 그린다.
   status.innerHTML = R.frameMsg('done');
   const showRouteMap = !pc && app.mapOk;
-  $('#course-body').innerHTML = R.courseBody(course, { showRouteMap });
+  const mapFailed = app.mapChecked && !app.mapOk;
+  $('#course-body').innerHTML = R.courseBody(course, { showRouteMap, mapFailed });
   if (showRouteMap) createRouteMap($('#route-map'), course.items);
   if (pc && mapVisible()) {
-    // TODO(열린 결정: PC에서 코스 핀과 촬영지 번호 핀이 겹칠 때) 지금은 코스를 여는 동안 촬영지 번호 핀을 숨긴다.
+    // PC 지도에는 코스를 여는 동안 코스 핀만 보인다(촬영지 번호 핀과 근처 핀은 숨김). 겹치는 핀 처리와 정보창은 MainMap.setCourse가 한다.
     app.main.clear('spots');
     app.main.clear('nearby');
     app.main.setCourse(course.items);
@@ -700,6 +707,7 @@ document.addEventListener('click', (e) => {
     case 'copy': return copyText(el.dataset.text);
     case 'close-panel': return navigate(href.work(app.db.byId.get(r.id).work));
     case 'retry': return boot();
+    case 'retry-map': return retryMap();
     case 'back': return back();
   }
 });
@@ -785,7 +793,7 @@ function toast(text) {
 // ── 시작 ──
 let mapPromise = null;
 async function boot() {
-  document.body.insertAdjacentHTML('beforeend', R.locateControls());
+  if (!$('.locate')) document.body.insertAdjacentHTML('beforeend', R.locateControls());
   if (!history.state) history.replaceState({ depth: 0 }, '');
   mapPromise ||= loadKakao(window.STILLSPOT_CONFIG?.kakaoJsKey);
   try {
@@ -800,20 +808,52 @@ async function boot() {
   app.mapChecked = true;
   // 지도가 안 되면 지도 화면(#/m)은 장소 상세로 돌려보낸다
   if (!app.mapOk) {
+    showMapFailNotice();
     if (app.route.name === 'home') return syncHomeMode(); // 지도 없이 검색 화면을 첫 화면으로
     return app.route.name === 'placemap' ? render(false) : undefined;
   }
+  attachMap();
+}
+
+// 지도 SDK가 준비되면 지도를 만들고 지금 화면에 붙인다(처음 불러온 때와 다시 시도해서 성공한 때 같이 쓴다).
+function attachMap() {
+  document.querySelectorAll('#map-fail').forEach((el) => el.remove());
   app.main = new MainMap($('#map'));
   app.main.onMapClick = collapseSheet;
   const n = app.route.name;
   // 첫 화면은 입력 중인 글자를 지우지 않도록 다시 그리지 않고 지도만 붙인다
-  if (n === 'home') return drawHomeMap(history.state);
+  if (n === 'home') {
+    syncHomeMode();
+    return drawHomeMap(history.state);
+  }
   // 지도가 필요한 화면이면 지도와 함께 다시 그린다(S3는 그대로 둔다. S5는 "지도로 보기" 버튼이 지도에 달려 있다)
   if (document.body.dataset.layout === 'pc' || n === 'work' || n === 'spot' || n === 'course' || n === 'place' || n === 'placemap') {
     saveState();
     app.pcWork = null;
     render(false);
   }
+}
+
+// 지도 SDK 실패 안내(오류 안내 + 다시 시도 버튼)를 화면 위쪽에 붙인다. 이미 있으면 다시 만들지 않는다.
+// 목록·상세·코스 카드는 그대로 쓸 수 있고, 경로 시각화와 근처 장소 핀만 빠진다.
+function showMapFailNotice() {
+  if (!app.mapChecked || app.mapOk || $('#map-fail')) return;
+  const html = R.mapFailNotice();
+  const name = app.route.name;
+  if (name === 'home') return $('#search-panel')?.insertAdjacentHTML('afterbegin', html);
+  if (name === 'work' || name === 'spot') return ($('.sheet-body') || $('.spot-body'))?.insertAdjacentHTML('afterbegin', html);
+  if (name === 'course') {
+    const stack = $('#course-body > div');
+    if (stack) stack.insertBefore(Object.assign(document.createElement('div'), { innerHTML: html }).firstElementChild, stack.querySelector('.timeline'));
+  }
+}
+
+async function retryMap() {
+  const btn = $('#map-fail [data-action="retry-map"]');
+  btn?.setAttribute('aria-busy', 'true');
+  app.mapOk = await retryKakao(window.STILLSPOT_CONFIG?.kakaoJsKey);
+  btn?.removeAttribute('aria-busy');
+  if (app.mapOk) attachMap();
 }
 
 boot();
