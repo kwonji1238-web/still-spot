@@ -3,3 +3,8 @@ config.js
 dist/
 node_modules/
 .netlify/
+# 도구·보관용(저장소에는 archive/dev 브랜치에만 있다)
+.agents/
+.claude/
+skills-lock.json
+ut/
