@@ -5,14 +5,14 @@ import { corners, esc, icon } from './render.js';
 
 const SDK_TIMEOUT_MS = 8000;
 const CLUSTER_CELL_PX = 60;
-// 이 확대 수준(카카오 레벨, 작을수록 확대) 이하에서는 묶지 않고 모두 흩뿌린다(2026-11-02 사용자 요청)
+// 이 확대 수준(카카오 레벨, 작을수록 확대) 이하에서는 묶지 않고 모두 흩뿌린다
 const NO_CLUSTER_LEVEL = 5;
-// 전체 촬영지 핀은 확대 수준에 따라 무게를 바꾼다(2026-11-02 사용자 승인: 검은 핀이 지도를 덮지 않게).
+// 전체 촬영지 핀은 확대 수준에 따라 무게를 바꾼다.
 // far: 속이 빈 작은 사각형 / mid: 흰 면 + 검은 꺾쇠 / near: 검은 면 + 흰 꺾쇠 + 이름표. 값은 카카오 레벨(작을수록 확대).
 const TIER_NEAR_MAX_LEVEL = 3;
 const TIER_MID_MAX_LEVEL = 5;
 const tierOf = (level) => (level <= TIER_NEAR_MAX_LEVEL ? 'near' : level <= TIER_MID_MAX_LEVEL ? 'mid' : 'far');
-// 한 칸(CLUSTER_CELL_PX)에 이 수 이상이 뭉쳐 있을 때만 묶음 핀으로 보인다. 그보다 적으면 핀을 따로 보인다(2026-11-02 사용자 요청: 30개 이상)
+// 한 칸(CLUSTER_CELL_PX)에 이 수 이상이 뭉쳐 있을 때만 묶음 핀으로 보인다. 그보다 적으면 핀을 따로 보인다
 const CLUSTER_MIN_MEMBERS = 30;
 let sdkPromise = null;
 
@@ -48,7 +48,7 @@ function boundsOf(points) {
 }
 
 function pinEl({ no, selected, label, nearby, all, cluster, clickable, tier, kind }) {
-  // 식당·카페 핀은 사각 프레임(꺾쇠) 대신 종류를 알려 주는 아이콘을 넣는다(2026-11-02 사용자 요청)
+  // 식당·카페 핀은 사각 프레임(꺾쇠) 대신 종류를 알려 주는 아이콘을 넣는다
   const glyph = nearby && (kind === 'restaurant' || kind === 'cafe') ? icon[kind === 'cafe' ? 'cafe' : 'food']() : '';
   const tag = clickable ? 'button' : 'div';
   const cls = ['pin', 'framed', selected && 'is-sel', nearby && 'is-nearby', all && 'is-all', glyph && 'is-glyph', all && tier && `is-t-${tier}`, cluster != null && 'is-cluster'].filter(Boolean).join(' ');
@@ -116,8 +116,8 @@ export class MainMap {
 
   // 첫 화면: 모든 촬영지 핀. 같은 좌표(한 장소)는 핀 하나로 합치고, 화면에서 가까운 핀끼리는 숫자 하나로 묶는다.
   // 지도를 움직이거나 확대·축소할 때마다 보이는 범위만 다시 계산한다(번호는 작품별 목록 순서라 여기서는 쓰지 않는다).
-  // 묶는 것은 촬영지 핀뿐이다. 근처 장소(관광지·식당·카페) 핀은 묶지 않는다(2026-11-01 사용자 요청).
-  // TODO(열린 결정: 묶음 핀의 크기·묶는 거리) 지금은 화면 60px 칸 안의 핀을 묶고, 확대 레벨 3 이하에서는 묶지 않는다.
+  // 묶는 것은 촬영지 핀뿐이다. 근처 장소(관광지·식당·카페) 핀은 묶지 않는다.
+  // TODO(열린 결정: 묶음 핀의 크기·묶는 거리) 지금은 화면 60px 칸 안에 30곳 이상이 뭉친 곳만 묶고, 확대 레벨 5 이하에서는 묶지 않는다.
   setAll(spots, onPick) {
     this.clear('spots');
     const byPos = new Map();
@@ -187,7 +187,7 @@ export class MainMap {
 
   // 근처 장소 핀 [제안]: 번호 없는 작은 핀 + 이름표. 경로선과 섞지 않는다.
   // TODO(열린 결정: 근처 장소 핀의 모양·선택 해제 방법·뒤로 가기 때 복원 여부)
-  // onPick을 주면 핀을 눌러 그 장소의 상세로 갈 수 있다(2026-11-01 사용자 요청).
+  // onPick을 주면 핀을 눌러 그 장소의 상세로 갈 수 있다.
   setNearby(candidates, onPick) {
     this.clear('nearby');
     for (const c of candidates) {
@@ -229,7 +229,7 @@ export class MainMap {
     return { lat: c.getLat(), lng: c.getLng(), level: this.map.getLevel() };
   }
 
-  // 첫 화면으로 돌아가도 지도가 그 자리에 머물게 한다(2026-11-01 사용자 요청).
+  // 첫 화면으로 돌아가도 지도가 그 자리에 머물게 한다.
   // 지도 칸의 위치·크기가 화면마다 달라서(PC는 왼쪽 목록 때문에 지도가 오른쪽으로 밀려 있다) 지도 중심의 화면 좌표를 같이 기억해 두었다가,
   // 돌아온 뒤에도 지도 위의 모든 곳이 화면의 같은 자리에 오도록 중심을 옮긴다.
   carryView() {

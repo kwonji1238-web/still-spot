@@ -59,9 +59,10 @@ const dist = (m) => {
 };
 const kindDist = (kind, m) => `${KIND_LABEL[kind]} · 직선 ${dist(m)}`;
 const source = () => `<p class="source">${esc(COPY.source)}</p>`;
-// 바텀시트가 올라와 있어도 맨 위의 서비스명 줄(로고·테마 버튼)은 그대로 둔다(2026-11-01 사용자 요청). 홈의 상단 메뉴와 같은 모양.
+// 바텀시트가 올라와 있어도 맨 위의 서비스명 줄(로고·테마 버튼)은 그대로 둔다. 홈의 상단 메뉴와 같은 모양.
 const topBrand = () =>
   `<header class="home-top"><button class="brand-lock" type="button" data-action="home" aria-label="${esc(COPY.goHome)}">${logoMark()}<span class="wordmark" lang="en">${esc(COPY.wordmark)}</span></button>${themeButton()}</header>`;
+const backBtn = () => `<button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button>`;
 const chev = () => `<span class="chev">${icon.chev()}</span>`;
 
 // ── S1·E1·E2 ──
@@ -160,12 +161,12 @@ function spotRow(spot, selectedId) {
   const chip = spot.no == null ? `<span class="chip-kind"><span class="dot-ring" aria-hidden="true"></span>${esc(COPY.addressOnly)}</span>` : '';
   const label = spot.no == null ? '' : `<span class="sr-only">${spot.no}번 </span>`;
   const sel = spot.id === selectedId;
-  // 줄 어디를 눌러도 상세(S3·E3)로 간다(2026-11-01 사용자 결정). 지도에서 그 핀을 보는 것은 핀을 눌러서 한다.
+  // 줄 어디를 눌러도 상세(S3·E3)로 간다. 지도에서 그 핀을 보는 것은 핀을 눌러서 한다.
   return `<li><button class="row${sel ? ' is-sel' : ''}" data-action="open-spot" data-id="${spot.id}" id="row-${spot.id}"${sel ? ' aria-current="true"' : ''}>${numBadge(spot.no)}
     <span class="grow"><span class="t-strong clamp2">${label}${esc(spot.name)}</span><span class="t-sub c-sub">${esc(spot.address)}</span>${chip ? `<span class="meta">${chip}</span>` : ''}</span>${chev()}</button></li>`;
 }
 
-// 작품 정보. 포스터 옆 칸은 촬영지 N곳 / 작품명 / 개봉연도 | 장르 순이다(줄거리·출연은 2026-11-01 사용자 요청으로 뺐다). 있는 줄만 나온다(접힌 시트에서는 CSS가 감춘다).
+// 작품 정보. 포스터 옆 칸은 촬영지 N곳 / 작품명 / 개봉연도 | 장르 순이다(줄거리·출연은 보이지 않는다). 있는 줄만 나온다(접힌 시트에서는 CSS가 감춘다).
 // 말줄임된 글(data-expand)은 누르면 펼쳐지고 다시 누르면 접힌다.
 function workMeta(info) {
   if (!info) return '';
@@ -173,13 +174,13 @@ function workMeta(info) {
   return yg ? `<p class="t-sub work-meta">${esc(yg)}</p>` : '';
 }
 
-// 포스터가 없거나 못 불러오면 서비스 로고를 보인다(2026-11-01 와이어프레임). 못 불러온 경우는 app.js의 error 처리가 바꾼다.
+// 포스터가 없거나 못 불러오면 서비스 로고를 보인다. 못 불러온 경우는 app.js의 error 처리가 바꾼다.
 const posterBox = (work) =>
   work.poster
     ? `<span class="poster"><img src="${esc(work.poster)}" alt="" loading="lazy" data-fallback="poster"></span>`
     : `<span class="poster is-logo" aria-hidden="true">${logoMark()}</span>`;
 
-// fit: 지도가 있을 때 포스터를 누르면 이 작품의 촬영지가 모두 보이게 지도를 줄인다(2026-11-02 사용자 요청)
+// fit: 지도가 있을 때 포스터를 누르면 이 작품의 촬영지가 모두 보이게 지도를 줄인다
 export function workHead(work, { toggle = null, fit = false } = {}) {
   const btn = toggle
     ? `<button class="btn-icon is-bare" data-action="sheet-toggle" aria-label="${toggle === 'down' ? COPY.sheetFold : COPY.sheetUnfold}">${toggle === 'down' ? icon.down() : icon.up()}</button>`
@@ -200,13 +201,13 @@ export function spotList(work, selectedId) {
 export function workScreenMobile(work, { mapOn, selectedId, level }) {
   if (!mapOn) {
     return `<div class="map-ctrl is-static" style="padding-left:var(--gutter);padding-right:var(--gutter)">
-      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button></div>
+      ${backBtn()}</div>
       <section class="sheet is-static">${workHead(work)}<div class="sheet-body">${spotList(work, selectedId)}</div></section>`;
   }
   return `
     ${topBrand()}
     <div class="map-ctrl is-below">
-      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button>
+      ${backBtn()}
     </div>
     <section class="sheet" id="sheet" data-level="${level}">
       <div class="sheet-grip" data-drag><span></span></div>
@@ -216,7 +217,7 @@ export function workScreenMobile(work, { mapOn, selectedId, level }) {
 }
 
 // ── S3 · E3 ──
-// 촬영지 바텀시트(모바일)와 상세 패널(PC)이 같은 내용을 쓴다(2026-11-01 와이어프레임):
+// 촬영지 바텀시트(모바일)와 상세 패널(PC)이 같은 내용을 쓴다:
 // 사진(없으면 로고) + 이름·주소·장면 설명 / 이 장소에서 촬영된 작품 / 근처에 이런 곳 / 코스 보기(얇은 버튼) / 다녀온 후기.
 // 촬영지 데이터에는 사진이 없어서 사진 칸은 늘 로고다. 장면 설명은 data/scenes.json에 있는 촬영지에만 나온다.
 function spotHead(spot, { toggle = null } = {}) {
@@ -224,8 +225,8 @@ function spotHead(spot, { toggle = null } = {}) {
     ? `<button class="btn-icon is-bare" data-action="sheet-toggle" aria-label="${toggle === 'down' ? COPY.sheetFold : COPY.sheetUnfold}">${toggle === 'down' ? icon.down() : icon.up()}</button>`
     : '';
   const scene = spot.scene ? `<p class="spot-scene t-sub clamp2" data-expand aria-expanded="false">${esc(spot.scene)}</p>` : '';
-  // 맨 위 이미지 영역(2026-11-02 사용자 요청: 관광지 상세와 같은 구성). 사진이 있는 촬영지(settings.js의 SPOT_PHOTOS)는 그 사진을,
-  // 없거나 못 불러오면 서비스 로고를 보인다. 접힌 시트에서는 CSS가 이 영역을 감춘다. PC 패널은 X를 이 영역 위의 별도 줄에 둔다(2026-11-02).
+  // 맨 위 이미지 영역. 사진이 있는 촬영지(settings.js의 SPOT_PHOTOS)는 그 사진을,
+  // 없거나 못 불러오면 서비스 로고를 보인다. 접힌 시트에서는 CSS가 이 영역을 감춘다. PC 패널은 X를 이 영역 위의 별도 줄에 둔다.
   // 사진이 여러 장이면 옆으로 넘기는 캐러셀이다. 왼쪽 여백은 지키고 오른쪽은 화면 끝까지 열어 두 번째 사진이 걸쳐 보인다.
   const slides = spot.photos?.length
     ? spot.photos.map((src) => `<div class="spot-slide"><img src="${esc(src)}" alt="" loading="lazy" data-fallback="hero"></div>`).join('')
@@ -255,7 +256,7 @@ function spotBody(spot, { works, preview, hasCourse }) {
         <div class="nearby-head"><h2 class="section-title">${esc(COPY.nearbyTitle)}</h2><p class="t-sub c-sub">${esc(COPY.nearbySub)}</p></div>
         <ul class="list">${preview
           .map(
-            // 줄을 누르면 장소 상세(S5)로 간다(2026-10-30 사용자 결정). 뒤로 가기는 이 화면으로 돌아온다.
+            // 줄을 누르면 장소 상세(S5)로 간다. 뒤로 가기는 이 화면으로 돌아온다.
             (c) => `<li><button class="row" data-action="open-place" data-id="${c.place.id}">${thumbTile(c.place)}
               <span class="grow"><span class="t-strong clamp2">${esc(c.place.name)}</span><span class="t-sub">${kindDist(c.place.kind, c.distance)}</span></span>${chev()}</button></li>`,
           )
@@ -273,7 +274,7 @@ function spotBody(spot, { works, preview, hasCourse }) {
     : `<p class="notice">${esc(COPY.noCoords)}</p>
        <button class="btn btn-ghost" data-action="copy" data-text="${esc(spot.address)}">${esc(COPY.copyAddress)}</button>`;
 
-  // 후기는 아직 만들지 않았다(2026-11-01 사용자 요청: '준비중' 안내로 막아 둔다)
+  // 후기는 아직 만들지 않아 '준비 중' 안내로 막아 둔다
   const reviews = `<section class="stack-8"><h2 class="section-title">${esc(COPY.reviewsTitle)}</h2><p class="notice">${esc(COPY.reviewsSoon)}</p></section>`;
 
   return `<div class="spot-body page-body">${noCoords}${worksHere}${nearby}${course}${reviews}${source()}</div>`;
@@ -282,13 +283,13 @@ function spotBody(spot, { works, preview, hasCourse }) {
 export function spotScreenMobile(spot, ctx, { mapOn, level }) {
   if (!mapOn) {
     return `<div class="map-ctrl is-static" style="padding-left:var(--gutter);padding-right:var(--gutter)">
-      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button></div>
+      ${backBtn()}</div>
       <section class="sheet is-static">${spotHead(spot)}<div class="sheet-body">${spotBody(spot, ctx)}</div></section>`;
   }
   return `
     ${topBrand()}
     <div class="map-ctrl is-below">
-      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button>
+      ${backBtn()}
     </div>
     <section class="sheet" id="sheet" data-level="${level}">
       <div class="sheet-grip" data-drag><span></span></div>
@@ -309,7 +310,7 @@ export function spotDetail(spot, ctx) {
 // ── S4 ──
 export function courseScreen(spot, { work, pc }) {
   return `<article class="page">
-    <div class="topbar"><button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button><span class="t-strong">${esc(COPY.courseTopbar)}</span></div>
+    <div class="topbar">${backBtn()}<span class="t-strong">${esc(COPY.courseTopbar)}</span></div>
     <div class="page-body">
       <h1 class="t-title">${esc(spot.name)} 근처 코스</h1>
       <div id="course-status"></div>
@@ -346,8 +347,8 @@ export function courseBody(course, { showRouteMap }) {
 }
 
 // ── S5 ──
-// 관광지·식당·카페 상세는 바텀시트가 아니라 새 페이지다(2026-11-01 사용자 요청). X를 누르면 바로 전 화면으로 돌아간다.
-// 모바일은 맨 위 줄(서비스명·테마 버튼 자리)을 X 하나로 바꾼다(2026-11-01 사용자 요청). X는 테두리 없는 아이콘이다.
+// 관광지·식당·카페 상세는 바텀시트가 아니라 새 페이지다. X를 누르면 바로 전 화면으로 돌아간다.
+// 모바일은 맨 위 줄(서비스명·테마 버튼 자리)을 X 하나로 바꾼다. X는 테두리 없는 아이콘이다.
 // PC는 지도 위 패널이라 위 줄이 없고, X는 사진 오른쪽 위(사진이 없으면 낮은 줄의 오른쪽)에 둔다.
 export function placeScreen(place, { spot, distance, canMap = false, pc = false }) {
   const closeBtn = (bare) => `<button class="btn-icon${bare ? ' is-bare' : ''}" data-action="back" aria-label="${esc(COPY.close)}">${icon.close()}</button>`;
@@ -379,10 +380,10 @@ export function placeScreen(place, { spot, distance, canMap = false, pc = false 
 }
 
 // ── PC ──
-// 장소 지도(모바일): 촬영지 번호 핀과 이 장소 핀을 한 화면에 보여 주는 보기 전용 지도(2026-10-30 사용자 결정, S5의 "지도로 보기").
+// 장소 지도(모바일): 촬영지 번호 핀과 이 장소 핀을 한 화면에 보여 주는 보기 전용 지도.
 export function placeMapScreen(place, { spot, distance }) {
   return `
-    <div class="map-ctrl"><button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button></div>
+    <div class="map-ctrl">${backBtn()}</div>
     <section class="map-card" id="map-card">
       <p class="meta"><span class="chip-kind">${KIND_LABEL[place.kind]}</span><span class="t-sub">${esc(spot.name)}에서 직선 ${dist(distance)}</span></p>
       <h1 class="t-title">${esc(place.name)}</h1>

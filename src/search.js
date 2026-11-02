@@ -60,8 +60,3 @@ export function searchSpots(spots, query, limit = 10) {
     ranges: at < 1e6 ? toRanges(indexMap(spot.name).slice(at, at + q.length)) : [],
   }));
 }
-
-export function findWorkByName(works, name) {
-  const n = normalize(name);
-  return works.find((w) => normalize(w.title) === n) || null;
-}

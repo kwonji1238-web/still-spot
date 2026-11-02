@@ -213,7 +213,7 @@ function drawHomeMap(st) {
 // 핀을 누르면 그 작품의 지도 화면(S2)에서 이 핀을 강조한다. PC는 상세 패널을 연다. [제안]
 // TODO(열린 결정: 첫 화면 핀을 눌렀을 때 이동 대상)
 function pickHomePin(spot) {
-  app.keepView = true; // 핀을 눌러 들어올 때는 시트만 올라오고 지도는 그 자리에 둔다(2026-11-02 사용자 요청)
+  app.keepView = true; // 핀을 눌러 들어올 때는 시트만 올라오고 지도는 그 자리에 둔다
   navigate(document.body.dataset.layout === 'pc' ? href.spot(spot.id) : href.work(spot.work, spot.id));
 }
 
@@ -430,7 +430,7 @@ function backToMap() {
   navigate(href.home());
 }
 
-// 선택된 핀을 한 번 더 누르면 선택이 풀리고 작품 목록(아무것도 선택 안 된 상태)으로 돌아간다. 작품 시트·목록과 지도 위치는 그대로(2026-11-01 사용자 요청).
+// 선택된 핀을 한 번 더 누르면 선택이 풀리고 작품 목록(아무것도 선택 안 된 상태)으로 돌아간다. 작품 시트·목록과 지도 위치는 그대로.
 function deselectSpot() {
   const r = app.route;
   if (r.name === 'spot') {
@@ -461,20 +461,14 @@ function pickSpot(id) {
   scrollRowIntoView(id);
   const work = app.db.workByTitle.get(app.db.byId.get(id).work);
   drawWorkPins(work);
-  // 핀을 눌렀을 때는 지도를 움직이지 않고 시트만 올린다(2026-11-02 사용자 요청). 펼침 시트는 지도가 보이게 반 열림으로 내린다.
+  // 핀을 눌렀을 때는 지도를 움직이지 않고 시트만 올린다. 펼침 시트는 지도가 보이게 반 열림으로 내린다.
   if (app.sheetLevel === 'expanded') setSheetLevel('half', false);
   saveState();
 }
 
-// 줄이나 핀을 눌렀을 때: 그 핀으로 확대한다(2026-10-30 사용자 결정). 펼침 시트는 지도가 보이게 반 열림으로 내린다.
-// TODO(열린 결정: 확대 수준) 지금은 카카오 레벨 4. 근처 핀까지 함께 보이게 맞추는 fitSelection은 다른 곳에서 쓴다.
+// 장소 상세의 "지도로 보기"가 그 장소로 확대할 때 쓰는 카카오 지도 레벨
+// TODO(열린 결정: 확대 수준) 지금은 카카오 레벨 4.
 const FOCUS_LEVEL = 4;
-function focusSelection() {
-  const sel = app.db.byId.get(app.selectedId);
-  if (!sel || sel.lat === null) return;
-  if (app.sheetLevel === 'expanded') setSheetLevel('half', false);
-  app.main.focus(sel, FOCUS_LEVEL, mapPadding());
-}
 
 // 목록에서 선택한 줄 표시(촬영지 줄은 li.row-split 전체에 걸린다)
 function markSelectedRow(id) {
@@ -492,7 +486,7 @@ function scrollRowIntoView(id) {
   body.scrollTop = row.offsetTop - body.offsetTop - 8;
 }
 
-// 바텀시트가 떠 있을 때 지도의 빈 곳을 누르면 시트를 접는다(2026-11-01 사용자 요청)
+// 바텀시트가 떠 있을 때 지도의 빈 곳을 누르면 시트를 접는다
 function collapseSheet() {
   const sheet = $('#sheet');
   if (!sheet || sheet.classList.contains('is-static') || app.sheetLevel === 'collapsed') return;
@@ -727,7 +721,7 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   const input = $('#q');
   if (!input) return;
-  // 빈 입력이면 안내 문구를 보이고 입력창에 둔다(2026-11-02 UX 문구 점검). 글자를 입력하면 사라진다.
+  // 빈 입력이면 안내 문구를 보이고 입력창에 둔다. 글자를 입력하면 사라진다.
   if (!input.value.trim()) {
     $('#search-hint')?.removeAttribute('hidden');
     return input.focus();

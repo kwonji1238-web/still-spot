@@ -2,12 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { buildIndex, adaptRestaurants, spotsAtSamePlace, stripLangNote, isClosedSpot } from '../src/data.js';
-import { searchWorks, searchSpots, findWorkByName, normalize } from '../src/search.js';
+import { searchWorks, searchSpots, normalize } from '../src/search.js';
 import { distanceM, formatDistance } from '../src/geo.js';
 import { previewCandidates, courseCandidates } from '../src/candidates.js';
 import { ruleCourse, validateAiCourse, cleanNote } from '../src/course.js';
 import { FEATURED } from '../src/settings.js';
 import { pickFeatured } from '../src/featured.js';
+import { slimRows, slimPosters } from '../scripts/slim.mjs';
 
 const read = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url)));
 const db = buildIndex({
@@ -233,4 +234,19 @@ test('폐업: 이름 앞에 [폐업]·[페업]이 붙은 촬영지는 내지 않
   assert.ok(new Set(db.spots.map((s) => s.id)).size === db.spots.length);
   assert.ok(db.spots.every((s) => Number(s.id.slice(1)) < raw.length));
   assert.equal(db.byId.get('s0')?.name, raw[0].plcNm.trim());
+});
+
+test('배포용 데이터: 줄인 사본으로 만든 결과가 원본으로 만든 결과와 같다', () => {
+  const posters = read('posters.json');
+  const full = buildIndex({ cinemap: read('cinemap.json'), attractions: read('attractions.json'), restaurants: read('restaurants.json'), posters, scenes: read('scenes.json') });
+  const slim = buildIndex({
+    cinemap: slimRows(read('cinemap.json'), 'cinemap'),
+    attractions: slimRows(read('attractions.json'), 'attractions'),
+    restaurants: slimRows(read('restaurants.json'), 'restaurants'),
+    posters: slimPosters(posters),
+    scenes: read('scenes.json'),
+  });
+  assert.deepEqual(slim.spots, full.spots);
+  assert.deepEqual(slim.places, full.places);
+  assert.deepEqual(slim.works.map((w) => [w.title, w.poster, w.info]), full.works.map((w) => [w.title, w.poster, w.info]));
 });

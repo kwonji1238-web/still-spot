@@ -2,6 +2,7 @@
 // 저장소 루트를 그대로 배포하면 .env, scripts/geocode-cache.json 같은 파일이 같이 올라가므로 이렇게 나눈다.
 // 번들러가 아니라 복사만 한다.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { slimRows, slimPosters } from './slim.mjs';
 
 const OUT = 'dist';
 rmSync(OUT, { recursive: true, force: true });
@@ -15,13 +16,14 @@ for (const f of ['favicon.svg', 'favicon.ico', 'favicon-16.png', 'favicon-32.png
 }
 cpSync('icon/favicon.ico', `${OUT}/favicon.ico`);
 cpSync('src', `${OUT}/src`, { recursive: true });
-// 검색 화면의 고정 촬영지 사진(src/settings.js의 FEATURED)
-if (existsSync('images')) cpSync('images', `${OUT}/images`, { recursive: true });
-for (const f of ['cinemap.json', 'attractions.json', 'restaurants.json']) {
-  cpSync(`data/${f}`, `${OUT}/data/${f}`);
-}
+// 검색 화면의 고정 촬영지 사진(src/settings.js의 FEATURED). 이미지 출처 문서(CREDITS.md)는 배포하지 않는다.
+if (existsSync('images')) cpSync('images', `${OUT}/images`, { recursive: true, filter: (f) => !f.endsWith('CREDITS.md') });
+// 배포용 데이터는 화면에서 쓰는 필드만 남긴 사본이다(scripts/slim.mjs). 원본은 data/에 그대로 있다.
+const readJson = (f) => JSON.parse(readFileSync(`data/${f}`, 'utf8'));
+const writeJson = (f, v) => writeFileSync(`${OUT}/data/${f}`, JSON.stringify(v));
+for (const kind of ['cinemap', 'attractions', 'restaurants']) writeJson(`${kind}.json`, slimRows(readJson(`${kind}.json`), kind));
 // 포스터 주소 파일은 scripts/posters.mjs를 돌린 뒤에만 있다(없어도 동작한다)
-if (existsSync('data/posters.json')) cpSync('data/posters.json', `${OUT}/data/posters.json`);
+if (existsSync('data/posters.json')) writeJson('posters.json', slimPosters(readJson('posters.json')));
 // 촬영지 장면 설명(data/scenes.json)도 있을 때만 복사한다
 if (existsSync('data/scenes.json')) cpSync('data/scenes.json', `${OUT}/data/scenes.json`);
 
