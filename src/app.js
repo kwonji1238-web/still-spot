@@ -3,7 +3,7 @@
 // 뒤로 가기는 브라우저 history를 쓰고, 떠나는 화면의 지도 위치·시트 높이·스크롤을 history.state에 저장해 복원한다.
 
 import { loadData, spotsAtSamePlace } from './data.js';
-import { searchWorks } from './search.js';
+import { searchWorks, searchSpots } from './search.js';
 import { previewCandidates, courseCandidates } from './candidates.js';
 import { ruleCourse } from './course.js';
 import { fetchAiCourse } from './api.js';
@@ -31,6 +31,7 @@ const app = {
   pcWork: null, // PC에서 지금 그려진 목록 패널의 작품
   featured: null,
   placeFocused: false, // PC에서 장소 상세의 "지도로 보기"로 지도를 그 장소에 맞춰 둔 상태(이때 X나 다른 핀을 눌러도 지도를 움직이지 않는다)
+  fitWorkOnce: false, // 이번 화면 전환에서는 작품의 모든 촬영지가 보이게 지도를 맞춘다(촬영지 시트의 포스터를 눌렀을 때)
   keepView: false, // 이번 화면 전환에서는 지도를 다시 맞추지 않는다(선택을 풀고 작품 목록으로 돌아올 때)
   carryView: null, // 선택을 풀고 첫 화면으로 돌아갈 때 지도를 그 자리에 두기 위한 값(한 번만 쓴다)
   searching: false, // 첫 화면에서 검색창을 열어 지도 위에 결과를 보이는 중
@@ -104,6 +105,10 @@ function render(fresh) {
   const layout = mq.matches ? 'pc' : 'mobile';
   document.body.dataset.layout = layout;
   document.body.dataset.screen = r.name;
+  // 본인 위치 버튼 위치는 화면마다 다시 정한다(바텀시트가 있으면 setSheetLevel이, 검색 화면이면 syncHomeMode가 채운다)
+  document.body.style.removeProperty('--locate-b');
+  delete document.body.dataset.sheetLevel;
+  document.body.classList.remove('is-searching', 'is-sheet-dragging');
 
   if (r.name === 'home') {
     app.pcWork = null;
@@ -119,6 +124,7 @@ function render(fresh) {
   if (layout === 'pc') renderPc(r, ctx, st);
   else renderMobile(r, ctx, st);
   app.keepView = false;
+  app.fitWorkOnce = false;
   if (r.name !== 'place') app.placeFocused = false;
 }
 
@@ -182,6 +188,7 @@ function syncHomeMode() {
   home.classList.toggle('is-searching', (app.searching && !panel) || noMap);
   home.classList.toggle('is-panel', panel);
   home.classList.toggle('no-map', noMap);
+  document.body.classList.toggle('is-searching', home.classList.contains('is-searching'));
 }
 
 // 모든 촬영지 핀을 부산 전체가 보이게 그린다(핀이 한 곳도 안 보이는 일이 없게 좌표 있는 촬영지를 모두 포함).
@@ -206,6 +213,7 @@ function drawHomeMap(st) {
 // 핀을 누르면 그 작품의 지도 화면(S2)에서 이 핀을 강조한다. PC는 상세 패널을 연다. [제안]
 // TODO(열린 결정: 첫 화면 핀을 눌렀을 때 이동 대상)
 function pickHomePin(spot) {
+  app.keepView = true; // 핀을 눌러 들어올 때는 시트만 올라오고 지도는 그 자리에 둔다(2026-11-02 사용자 요청)
   navigate(document.body.dataset.layout === 'pc' ? href.spot(spot.id) : href.work(spot.work, spot.id));
 }
 
@@ -216,8 +224,10 @@ function updateResults(q) {
     results.innerHTML = R.featuredBlock(featured());
     return;
   }
+  $('#search-hint')?.setAttribute('hidden', '');
   const hits = searchWorks(app.db.works, q);
-  results.innerHTML = hits.length ? R.matchBlock(hits) : R.noResultBlock(featured());
+  const spotHits = searchSpots(app.db.spots, q);
+  results.innerHTML = hits.length || spotHits.length ? R.matchBlock(hits, spotHits) : R.noResultBlock(featured());
 }
 
 // 검색을 닫고 지도로 돌아간다(입력한 글자도 지운다)
@@ -238,7 +248,7 @@ const HOME_PADDING = [152, 24, 136, 24]; // 위쪽은 상단 메뉴와 검색창
 const inBusan = (p) => p.lat >= BUSAN_BOUNDS.south && p.lat <= BUSAN_BOUNDS.north && p.lng >= BUSAN_BOUNDS.west && p.lng <= BUSAN_BOUNDS.east;
 
 function locateMe() {
-  if (!navigator.geolocation) return openLocateDialog();
+  if (!navigator.geolocation) return openLocateDialog('failed');
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
       const me = { lat: coords.latitude, lng: coords.longitude };
@@ -246,9 +256,9 @@ function locateMe() {
         app.main.showMe(me);
         app.main.focus(me, 5, HOME_PADDING);
       }
-      if (!inBusan(me)) openLocateDialog();
+      if (!inBusan(me)) openLocateDialog('outside');
     },
-    () => openLocateDialog(), // 거부·실패: 지도는 그대로 두고 안내만
+    () => openLocateDialog('failed'), // 거부·실패: 지도는 그대로 두고 안내만
     { timeout: 8000, maximumAge: 60000 },
   );
 }
@@ -258,9 +268,16 @@ function goToBusan() {
   if (app.main) app.main.fit(app.db.spots.filter((s) => s.lat !== null), HOME_PADDING);
 }
 
-function openLocateDialog() {
+// kind: 'outside'(부산 밖, 부산으로 이동 권유) | 'failed'(위치를 못 받음, 닫기만)
+function openLocateDialog(kind = 'outside') {
   const dlg = $('#locate-dialog');
   if (!dlg) return;
+  const failed = kind === 'failed';
+  $('#locate-dialog-title').textContent = failed ? COPY.locateFailTitle : COPY.locateDialog;
+  $('#locate-dialog-body').textContent = failed ? COPY.locateFailBody : COPY.locateBody;
+  const btn = $('#locate-dialog-btn');
+  btn.textContent = failed ? COPY.close : COPY.locateGo;
+  btn.dataset.action = failed ? 'close-dialog' : 'locate-go';
   dlg.hidden = false;
   dlg.querySelector('[data-action="close-dialog"]').focus();
 }
@@ -337,7 +354,7 @@ function renderSpotMobile({ spot, work }, st) {
   app.main.clear('course');
   drawWorkPins(work);
   if (st?.view) app.main.setView(st.view);
-  else fitSelection();
+  else if (!app.keepView) fitSelection();
 }
 
 // ── S2 (모바일): 지도 + 시트 3단계 ──
@@ -370,7 +387,8 @@ function renderWorkMobile(r, { work }, st) {
   app.main.relayout();
   drawWorkPins(work);
   if (st?.view) app.main.setView(st.view);
-  else if (app.selectedId) fitSelection();
+  else if (app.fitWorkOnce) fitWork(work); // 포스터를 눌러 들어오면 이 작품의 촬영지가 한눈에 보이게 줄인다
+  else if (app.selectedId) { if (!app.keepView) fitSelection(); }
   else if (!app.keepView) fitWork(work);
 }
 
@@ -433,7 +451,7 @@ function pickSpot(id) {
   // 이미 선택된 핀을 한 번 더 누르면 선택이 풀린다
   if (id === app.selectedId && (app.route.name === 'work' || app.route.name === 'spot')) return deselectSpot();
   if (document.body.dataset.layout === 'pc' || app.route.name === 'spot') {
-    if (app.placeFocused) app.keepView = true;
+    app.keepView = true; // 핀을 눌러 선택할 때는 지도를 움직이지 않는다
     return navigate(href.spot(id));
   }
   app.selectedId = id;
@@ -443,7 +461,8 @@ function pickSpot(id) {
   scrollRowIntoView(id);
   const work = app.db.workByTitle.get(app.db.byId.get(id).work);
   drawWorkPins(work);
-  focusSelection();
+  // 핀을 눌렀을 때는 지도를 움직이지 않고 시트만 올린다(2026-11-02 사용자 요청). 펼침 시트는 지도가 보이게 반 열림으로 내린다.
+  if (app.sheetLevel === 'expanded') setSheetLevel('half', false);
   saveState();
 }
 
@@ -486,11 +505,14 @@ function setSheetLevel(level, save = true) {
   app.sheetLevel = level;
   sheet.dataset.level = level;
   sheet.style.setProperty('--sheet-h', `${sheetHeights()[level]}px`);
+  // 본인 위치 버튼은 시트 바로 위에 둔다. 펼침일 때는 시트가 화면 위까지 올라와 버튼을 숨긴다(CSS)
+  document.body.style.setProperty('--locate-b', `calc(${sheetHeights()[level]}px + 0.75rem)`);
+  document.body.dataset.sheetLevel = level;
   const btn = sheet.querySelector('[data-action="sheet-toggle"]');
   if (btn) {
     const down = level === 'expanded';
     btn.innerHTML = down ? R.icon.down() : R.icon.up();
-    btn.setAttribute('aria-label', down ? '목록 접기' : '목록 펼치기');
+    btn.setAttribute('aria-label', down ? COPY.sheetFold : COPY.sheetUnfold);
   }
   if (save) saveState();
 }
@@ -499,24 +521,27 @@ function bindSheet() {
   const sheet = $('#sheet');
   sheet.querySelectorAll('[data-drag]').forEach((handle) => {
     handle.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button, [data-expand]')) return;
+      if (e.target.closest('button, [data-expand], .spot-hero-track')) return; // 캐러셀은 옆으로 넘긴다
       const startY = e.clientY;
       const startH = sheet.getBoundingClientRect().height;
       const hs = sheetHeights();
       let moved = false;
       handle.setPointerCapture(e.pointerId);
       sheet.classList.add('is-dragging');
+      document.body.classList.add('is-sheet-dragging');
       const move = (ev) => {
         const dy = startY - ev.clientY;
         if (Math.abs(dy) > 4) moved = true;
         const h = Math.max(hs.collapsed, Math.min(hs.expanded, startH + dy));
         sheet.style.setProperty('--sheet-h', `${h}px`);
+        document.body.style.setProperty('--locate-b', `calc(${h}px + 0.75rem)`);
       };
       const up = () => {
         handle.removeEventListener('pointermove', move);
         handle.removeEventListener('pointerup', up);
         handle.removeEventListener('pointercancel', up);
         sheet.classList.remove('is-dragging');
+        document.body.classList.remove('is-sheet-dragging');
         if (!moved) return setSheetLevel(app.sheetLevel);
         const h = sheet.getBoundingClientRect().height;
         const level = Object.entries(hs).sort((a, b) => Math.abs(a[1] - h) - Math.abs(b[1] - h))[0][0];
@@ -570,7 +595,7 @@ function renderPc(r, ctx, st) {
 
   const sameWork = app.pcWork === work.title && !!$('#pc-list');
   if (!sameWork) {
-    screen.innerHTML = R.pcFrame(work, { selectedId: app.selectedId });
+    screen.innerHTML = R.pcFrame(work, { selectedId: app.selectedId, fit: mapOn });
     app.pcWork = work.title;
     $('#pc-q').addEventListener('input', (e) => navigate(href.home(e.target.value)));
   } else {
@@ -590,6 +615,7 @@ function renderPc(r, ctx, st) {
       app.main.clear('course');
       drawWorkPins(work);
       if (st?.view && !app.keepView) app.main.setView(st.view);
+      else if (app.fitWorkOnce) fitWork(work);
       else if (app.selectedId && ctx.spot.lat !== null && !app.keepView) fitSelection();
       // 촬영지·코스·장소 상세 패널을 X로 닫을 때는 그 자리에서 패널만 닫는다(지도를 다시 맞추지 않는다)
       else if (r.name === 'work' && !app.keepView && !(sameWork && ['spot', 'course', 'place'].includes(app.prevRoute?.name))) fitWork(work);
@@ -640,7 +666,9 @@ document.addEventListener('click', (e) => {
     case 'open-spot': return navigate(href.spot(id));
     case 'open-course': return navigate(href.course(id));
     case 'open-place': return navigate(href.place(r.id, id));
-    case 'view-on-map': return navigate(href.work(app.db.byId.get(id).work, id));
+    case 'view-on-map':
+      app.fitWorkOnce = true; // 포스터: 그 작품의 촬영지가 모두 보이게 지도를 줄이고, 이 촬영지를 선택해 둔다
+      return navigate(href.work(app.db.byId.get(id).work, id));
     case 'home': {
       // 첫 화면에서 누르면 검색을 닫고 지도를 처음 상태(촬영지 전체)로 되돌린다. 다른 화면에서는 첫 화면으로 간다.
       if (app.route.name !== 'home') return navigate(href.home());
@@ -652,8 +680,18 @@ document.addEventListener('click', (e) => {
     case 'search-cancel': return closeSearch();
     case 'pick-spot-card': return pickHomePin(app.db.byId.get(id));
     case 'locate': return locateMe();
+    case 'pick-spot-hit': return pickHomePin(app.db.byId.get(el.dataset.id));
     case 'locate-go': return goToBusan();
     case 'close-dialog': return closeLocateDialog();
+    case 'fit-work': {
+      // 장소 리스트를 보다가 포스터를 누르면 이 작품의 촬영지가 모두 보이게 지도를 줄인다. 선택은 그대로 둔다.
+      if (!mapVisible()) return;
+      const work = app.db.workByTitle.get(app.pcWork || app.route.title);
+      if (!work) return;
+      if (app.sheetLevel === 'expanded') setSheetLevel('half', false);
+      fitWork(work);
+      return;
+    }
     case 'sheet-toggle': {
       const next = { collapsed: 'half', half: 'expanded', expanded: 'half' }[app.sheetLevel];
       return setSheetLevel(next);
@@ -689,11 +727,16 @@ document.addEventListener('submit', (e) => {
   e.preventDefault();
   const input = $('#q');
   if (!input) return;
-  // TODO(열린 결정: 빈 입력 안내 문구) PRD F-01 "빈 입력이면 안내한다". 문구가 없어 지금은 입력창으로 돌아간다.
-  if (!input.value.trim()) return input.focus();
+  // 빈 입력이면 안내 문구를 보이고 입력창에 둔다(2026-11-02 UX 문구 점검). 글자를 입력하면 사라진다.
+  if (!input.value.trim()) {
+    $('#search-hint')?.removeAttribute('hidden');
+    return input.focus();
+  }
   const hits = searchWorks(app.db.works, input.value, 1);
-  if (hits.length) navigate(href.work(hits[0].work.title));
-  else input.blur();
+  if (hits.length) return navigate(href.work(hits[0].work.title));
+  const spotHits = searchSpots(app.db.spots, input.value, 1);
+  if (spotHits.length) return pickHomePin(spotHits[0].spot);
+  input.blur();
 });
 
 // 사진 주소가 깨지면 그 칸을 없앤다(빈 칸을 남기지 않음)
@@ -710,6 +753,11 @@ document.addEventListener(
       const box = img.parentElement;
       box.className = 'poster is-logo';
       box.innerHTML = R.logoMark();
+    } else if (img.dataset.fallback === 'hero') {
+      const box = img.parentElement;
+      box.classList.add('is-logo');
+      img.remove();
+      box.insertAdjacentHTML('afterbegin', R.logoMark());
     } else if (img.dataset.fallback === 'remove-photo') {
       img.parentElement.className = 'lowbar';
       img.remove();
@@ -744,6 +792,7 @@ function toast(text) {
 // ── 시작 ──
 let mapPromise = null;
 async function boot() {
+  document.body.insertAdjacentHTML('beforeend', R.locateControls());
   if (!history.state) history.replaceState({ depth: 0 }, '');
   mapPromise ||= loadKakao(window.STILLSPOT_CONFIG?.kakaoJsKey);
   try {

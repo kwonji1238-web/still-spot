@@ -38,6 +38,29 @@ function toRanges(positions) {
   return ranges;
 }
 
+// 촬영지 검색: 장소 이름·주소에 부분 일치. 같은 이름·주소의 촬영지(여러 작품)는 한 번만 나온다. 이름 일치가 위.
+// 결과: [{ spot, ranges }] — ranges는 이름에서 굵게 할 구간(주소에서만 맞으면 빈 배열)
+export function searchSpots(spots, query, limit = 10) {
+  const q = normalize(query);
+  if (!q) return [];
+  const seen = new Set();
+  const hits = [];
+  for (const spot of spots) {
+    const key = `${spot.name}|${spot.address}`;
+    if (seen.has(key)) continue;
+    const inName = normalize(spot.name).indexOf(q);
+    const inAddr = normalize(spot.address || '').indexOf(q);
+    if (inName < 0 && inAddr < 0) continue;
+    seen.add(key);
+    hits.push({ spot, at: inName >= 0 ? inName : 1e6 + inAddr, len: spot.name.length });
+  }
+  hits.sort((a, b) => a.at - b.at || a.len - b.len || a.spot.name.localeCompare(b.spot.name, 'ko'));
+  return hits.slice(0, limit).map(({ spot, at }) => ({
+    spot,
+    ranges: at < 1e6 ? toRanges(indexMap(spot.name).slice(at, at + q.length)) : [],
+  }));
+}
+
 export function findWorkByName(works, name) {
   const n = normalize(name);
   return works.find((w) => normalize(w.title) === n) || null;

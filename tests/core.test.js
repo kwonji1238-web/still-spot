@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { buildIndex, adaptRestaurants, spotsAtSamePlace } from '../src/data.js';
-import { searchWorks, findWorkByName, normalize } from '../src/search.js';
+import { buildIndex, adaptRestaurants, spotsAtSamePlace, stripLangNote, isClosedSpot } from '../src/data.js';
+import { searchWorks, searchSpots, findWorkByName, normalize } from '../src/search.js';
 import { distanceM, formatDistance } from '../src/geo.js';
 import { previewCandidates, courseCandidates } from '../src/candidates.js';
 import { ruleCourse, validateAiCourse, cleanNote } from '../src/course.js';
@@ -16,10 +16,10 @@ const db = buildIndex({
   restaurants: read('restaurants.json'),
 });
 
-test('데이터: 촬영지 2,193건, 좌표 없음 111건, 작품 428개, 모두 region', () => {
-  assert.equal(db.spots.length, 2193);
-  assert.equal(db.spots.filter((s) => s.lat === null).length, 111);
-  assert.equal(db.works.length, 428);
+test('데이터: 촬영지 2,126건(원본 2,193건에서 [폐업] 67건 제외), 좌표 없음 110건, 작품 425개, 모두 region', () => {
+  assert.equal(db.spots.length, 2126);
+  assert.equal(db.spots.filter((s) => s.lat === null).length, 110);
+  assert.equal(db.works.length, 425);
   assert.ok([...db.byId.values()].every((p) => p.region === 'busan'));
 });
 
@@ -89,11 +89,18 @@ test('촬영지: 장면 설명은 scenes.json에 있는 촬영지에만 붙는�
   assert.ok(db.spots.every((s) => s.scene === null));
 });
 
-test('촬영지 썸네일: 도모헌(부산시 열린행사장)에만 사진과 출처가 있다', () => {
+test('촬영지 썸네일: 도모헌(출처 문구 있음)과 정란각에만 사진이 있다', () => {
   const withPhoto = db.spots.filter((s) => s.photo);
-  assert.ok(withPhoto.length >= 1);
-  assert.ok(withPhoto.every((s) => s.name === '부산시 열린행사장' && s.photo === 'images/domoheon.jpg' && s.photoCredit === '[출처 : 부산시]'));
+  assert.ok(withPhoto.length >= 2);
+  assert.ok(withPhoto.every((s) => ['부산시 열린행사장', '문화공감수정(정란각)'].includes(s.name)));
+  assert.ok(withPhoto.filter((s) => s.name === '부산시 열린행사장').every((s) => s.photo === 'images/domoheon.jpg' && s.photoCredit === '[출처 : 부산시]'));
+  assert.ok(withPhoto.filter((s) => s.name !== '부산시 열린행사장').every((s) => s.photo === 'images/jeongrangak.jpg'));
   assert.ok(existsSync(new URL('../images/domoheon.jpg', import.meta.url)));
+  assert.ok(existsSync(new URL('../images/jeongrangak.jpg', import.meta.url)));
+  const jr = withPhoto.find((s) => s.name === '문화공감수정(정란각)');
+  assert.equal(jr.photos.length, 2);
+  assert.ok(jr.photos.every((p) => existsSync(new URL(`../${p}`, import.meta.url))));
+  assert.ok(db.spots.filter((s) => !s.photo).every((s) => s.photos.length === 0));
 });
 
 test('검색: 띄어쓰기 무시 부분 일치, 앞부분 일치가 위', () => {
@@ -190,4 +197,40 @@ test('데이터: 대표메뉴는 식당·카페에만, 소개 제목은 관광�
   assert.ok(food.some((p) => p.menu));
   assert.ok(food.every((p) => !('intro' in p)));
   assert.ok(db.places.filter((p) => p.kind === 'attraction').every((p) => p.title));
+});
+
+test('촬영지 검색: 이름·주소 부분 일치, 같은 장소는 한 번, 이름 일치가 위', () => {
+  const r = searchSpots(db.spots, '정란각');
+  assert.ok(r.length >= 1);
+  assert.equal(new Set(r.map((h) => `${h.spot.name}|${h.spot.address}`)).size, r.length);
+  assert.ok(r[0].spot.name.includes('정란각'));
+  assert.ok(r[0].ranges.length > 0);
+  const byAddr = searchSpots(db.spots, '범일로90번길');
+  assert.ok(byAddr.length >= 1 && byAddr.every((h) => h.spot.address.includes('범일로90번길') || h.spot.name.includes('범일로90번길')));
+  assert.deepEqual(searchSpots(db.spots, '  '), []);
+  assert.deepEqual(searchSpots(db.spots, 'zzzz없는곳'), []);
+  assert.ok(searchSpots(db.spots, '부산', 5).length <= 5);
+});
+
+test('관광지 이름: 끝의 지원 언어 표기만 떼고 다른 괄호는 둔다', () => {
+  assert.equal(stripLangNote('이중섭문화거리(한,영,중간,중번,일)'), '이중섭문화거리');
+  assert.equal(stripLangNote('해동용궁사 (한,영,중간,중번,일)'), '해동용궁사');
+  assert.equal(stripLangNote('어딘가(한, 영, 중간, 중번)'), '어딘가');
+  assert.equal(stripLangNote('어딘가(한)'), '어딘가');
+  assert.equal(stripLangNote('부네치아(부네치아)'), '부네치아(부네치아)');
+  assert.equal(stripLangNote('구 대신공원(구 대신공원)'), '구 대신공원(구 대신공원)');
+  assert.ok(db.places.filter((p) => p.kind === 'attraction').every((p) => !/\(\s*한/.test(p.name)));
+});
+
+test('폐업: 이름 앞에 [폐업]·[페업]이 붙은 촬영지는 내지 않고, 원본 파일은 그대로 둔다', () => {
+  const raw = read('cinemap.json');
+  const closed = raw.filter((r) => isClosedSpot(r.plcNm));
+  assert.equal(closed.length, 67);
+  assert.equal(raw.length, 2193);
+  assert.ok(db.spots.every((s) => !isClosedSpot(s.name)));
+  assert.equal(db.spots.length, raw.length - closed.length);
+  assert.ok(db.spots.some((s) => s.name.startsWith('[철거]')));
+  assert.ok(new Set(db.spots.map((s) => s.id)).size === db.spots.length);
+  assert.ok(db.spots.every((s) => Number(s.id.slice(1)) < raw.length));
+  assert.equal(db.byId.get('s0')?.name, raw[0].plcNm.trim());
 });

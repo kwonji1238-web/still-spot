@@ -18,6 +18,9 @@ export const icon = {
   up: () => svg('<path d="M5 15l7-7 7 7"/>'),
   down: () => svg('<path d="M5 9l7 7 7-7"/>'),
   locate: () => svg('<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.75"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>'),
+  // 지도 핀 안의 식당(포크·나이프)·카페(컵) 아이콘
+  food: (size = 14) => svg('<path d="M6 3v6a2 2 0 004 0V3M8 3v18M17 21V3c-2.2 1.2-3 4-3 7h3"/>', size),
+  cafe: (size = 14) => svg('<path d="M4.5 9h11v4a5 5 0 01-5 5h-1a5 5 0 01-5-5V9zM15.5 10.5h1.5a2 2 0 010 4h-1.5M8 3.5v2.5M12 3.5v2.5"/>', size),
   pin: () => svg('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.25"/>', 16),
   warn: () =>
     `<svg class="warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5L2.5 20h19L12 3.5z"/><path d="M12 10v4.5M12 17.25v.01" stroke-linecap="round"/></svg>`,
@@ -72,26 +75,30 @@ export function homeScreen(q, { credit = false } = {}) {
     <h1 class="sr-only">${esc(COPY.heroCopy)}</h1>
     <form class="search-row" role="search" data-action="search-submit">
       <label class="search">
-        <span class="sr-only">작품 검색</span>
+        <span class="sr-only">${esc(COPY.searchLabel)}</span>
         <input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="${esc(COPY.searchPlaceholder)}" value="${esc(q)}">
-        <button class="btn-icon" type="submit" aria-label="검색">${icon.search()}</button>
+        <button class="btn-icon" type="submit" aria-label="${esc(COPY.searchSubmit)}">${icon.search()}</button>
       </label>
     </form>
     <div class="search-panel" id="search-panel">
+      <div class="notice is-error" id="search-hint" role="alert" hidden>${icon.warn()}<p>${esc(COPY.emptyQuery)}</p></div>
       <div class="results" id="results"></div>
       ${credit ? `<p class="source home-credit">${esc(COPY.tmdbCredit)}</p>` : ''}
     </div>
-  </div>
+  </div>`;
+}
+
+// 본인 위치 버튼과 안내 팝업. 화면이 바뀌어도 남도록 #screen 밖(body)에 한 번만 둔다.
+export const locateControls = () => `
   <button class="btn-icon locate" type="button" data-action="locate" aria-label="${esc(COPY.locate)}">${icon.locate()}</button>
   <div class="dialog-back" id="locate-dialog" hidden>
     <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="locate-dialog-title" aria-describedby="locate-dialog-body">
       <button class="btn-icon is-bare dialog-x" type="button" data-action="close-dialog" aria-label="${esc(COPY.close)}">${icon.close()}</button>
       <h2 class="t-title" id="locate-dialog-title">${esc(COPY.locateDialog)}</h2>
       <p class="t-body c-sub" id="locate-dialog-body">${esc(COPY.locateBody)}</p>
-      <button class="btn btn-fill" type="button" data-action="locate-go">${esc(COPY.locateGo)}</button>
+      <button class="btn btn-fill" id="locate-dialog-btn" type="button" data-action="locate-go">${esc(COPY.locateGo)}</button>
     </section>
   </div>`;
-}
 
 const workRow = (work, label, strong = true) => `
   <li><button class="row" data-action="open-work" data-title="${esc(work.title)}">
@@ -124,15 +131,28 @@ function highlight(title, ranges) {
   return out + esc(title.slice(i));
 }
 
-export function matchBlock(hits) {
-  return `<section class="stack-8"><h2 class="section-title">${esc(COPY.matchingLabel)}</h2>
+export function matchBlock(hits, spotHits = []) {
+  const works = hits.length
+    ? `<section class="stack-8"><h2 class="section-title">${esc(COPY.matchingLabel)}</h2>
     <ul class="list">${hits
       .map((h) => workRow(h.work, `<span class="match">${highlight(h.work.title, h.ranges)}</span>`, false))
-      .join('')}</ul></section>`;
+      .join('')}</ul></section>`
+    : '';
+  // 촬영지 검색 결과: 누르면 그 촬영지로 간다(첫 화면 핀을 누른 것과 같다)
+  const spots = spotHits.length
+    ? `<section class="stack-8"><h2 class="section-title">${esc(COPY.matchingSpotLabel)}</h2>
+    <ul class="list">${spotHits
+      .map(
+        (h) => `<li><button class="row" data-action="pick-spot-hit" data-id="${h.spot.id}">
+      <span class="grow"><span class="clamp2"><span class="match">${highlight(h.spot.name, h.ranges)}</span></span><span class="t-sub c-sub clamp2">${esc(h.spot.address)}</span></span>${chev()}</button></li>`,
+      )
+      .join('')}</ul></section>`
+    : '';
+  return works + spots;
 }
 
 export function noResultBlock(featured) {
-  return `<section class="empty-msg" aria-live="polite"><h2 class="t-title">${esc(COPY.noResult)}</h2></section>${featuredBlock(featured)}`;
+  return `<section class="empty-msg" aria-live="polite"><h2 class="t-title">${esc(COPY.noResult)}</h2><p class="t-sub c-sub">${esc(COPY.noResultHint)}</p></section>${featuredBlock(featured)}`;
 }
 
 // ── S2 시트 · PC 목록 패널 ──
@@ -159,13 +179,14 @@ const posterBox = (work) =>
     ? `<span class="poster"><img src="${esc(work.poster)}" alt="" loading="lazy" data-fallback="poster"></span>`
     : `<span class="poster is-logo" aria-hidden="true">${logoMark()}</span>`;
 
-export function workHead(work, { toggle = null } = {}) {
+// fit: 지도가 있을 때 포스터를 누르면 이 작품의 촬영지가 모두 보이게 지도를 줄인다(2026-11-02 사용자 요청)
+export function workHead(work, { toggle = null, fit = false } = {}) {
   const btn = toggle
-    ? `<button class="btn-icon is-bare" data-action="sheet-toggle" aria-label="${toggle === 'down' ? '목록 접기' : '목록 펼치기'}">${toggle === 'down' ? icon.down() : icon.up()}</button>`
+    ? `<button class="btn-icon is-bare" data-action="sheet-toggle" aria-label="${toggle === 'down' ? COPY.sheetFold : COPY.sheetUnfold}">${toggle === 'down' ? icon.down() : icon.up()}</button>`
     : '';
   return `<header class="sheet-head">
     <div class="sheet-head-row">
-    ${posterBox(work)}
+    ${fit ? `<button class="poster-btn" type="button" data-action="fit-work" aria-label="${esc(COPY.fitWork)}">${posterBox(work)}</button>` : posterBox(work)}
     <div class="grow"><p class="t-sub">${count(work.spots.length)}</p><h1 class="t-title clamp1" data-expand aria-expanded="false">${esc(work.title)}</h1>${workMeta(work.info)}</div>
     ${btn}
     </div>
@@ -179,17 +200,17 @@ export function spotList(work, selectedId) {
 export function workScreenMobile(work, { mapOn, selectedId, level }) {
   if (!mapOn) {
     return `<div class="map-ctrl is-static" style="padding-left:var(--gutter);padding-right:var(--gutter)">
-      <button class="btn-icon" data-action="back" aria-label="뒤로 가기">${icon.back()}</button></div>
+      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button></div>
       <section class="sheet is-static">${workHead(work)}<div class="sheet-body">${spotList(work, selectedId)}</div></section>`;
   }
   return `
     ${topBrand()}
     <div class="map-ctrl is-below">
-      <button class="btn-icon" data-action="back" aria-label="뒤로 가기">${icon.back()}</button>
+      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button>
     </div>
     <section class="sheet" id="sheet" data-level="${level}">
       <div class="sheet-grip" data-drag><span></span></div>
-      <div data-drag>${workHead(work, { toggle: level === 'expanded' ? 'down' : 'up' })}</div>
+      <div data-drag>${workHead(work, { toggle: level === 'expanded' ? 'down' : 'up', fit: true })}</div>
       <div class="sheet-body" id="sheet-body">${spotList(work, selectedId)}</div>
     </section>`;
 }
@@ -200,17 +221,20 @@ export function workScreenMobile(work, { mapOn, selectedId, level }) {
 // 촬영지 데이터에는 사진이 없어서 사진 칸은 늘 로고다. 장면 설명은 data/scenes.json에 있는 촬영지에만 나온다.
 function spotHead(spot, { toggle = null } = {}) {
   const btn = toggle
-    ? `<button class="btn-icon is-bare" data-action="sheet-toggle" aria-label="${toggle === 'down' ? '목록 접기' : '목록 펼치기'}">${toggle === 'down' ? icon.down() : icon.up()}</button>`
+    ? `<button class="btn-icon is-bare" data-action="sheet-toggle" aria-label="${toggle === 'down' ? COPY.sheetFold : COPY.sheetUnfold}">${toggle === 'down' ? icon.down() : icon.up()}</button>`
     : '';
   const scene = spot.scene ? `<p class="spot-scene t-sub clamp2" data-expand aria-expanded="false">${esc(spot.scene)}</p>` : '';
-  // 사진이 있는 촬영지(settings.js의 SPOT_PHOTOS)는 그 사진을, 없거나 못 불러오면 로고를 보인다
-  const thumb = spot.photo
-    ? `<span class="poster"><img src="${esc(spot.photo)}" alt="" loading="lazy" data-fallback="poster"></span>`
-    : `<span class="poster is-logo" aria-hidden="true">${logoMark()}</span>`;
+  // 맨 위 이미지 영역(2026-11-02 사용자 요청: 관광지 상세와 같은 구성). 사진이 있는 촬영지(settings.js의 SPOT_PHOTOS)는 그 사진을,
+  // 없거나 못 불러오면 서비스 로고를 보인다. 접힌 시트에서는 CSS가 이 영역을 감춘다. PC 패널은 X를 이 영역 위의 별도 줄에 둔다(2026-11-02).
+  // 사진이 여러 장이면 옆으로 넘기는 캐러셀이다. 왼쪽 여백은 지키고 오른쪽은 화면 끝까지 열어 두 번째 사진이 걸쳐 보인다.
+  const slides = spot.photos?.length
+    ? spot.photos.map((src) => `<div class="spot-slide"><img src="${esc(src)}" alt="" loading="lazy" data-fallback="hero"></div>`).join('')
+    : `<div class="spot-slide is-logo">${logoMark()}</div>`;
+  const hero = `<div class="spot-hero${spot.photos?.length > 1 ? ' is-multi' : ''}"><div class="spot-hero-track">${slides}</div></div>`;
   const credit = spot.photoCredit ? `<p class="t-micro c-sub">${esc(spot.photoCredit)}</p>` : '';
-  return `<header class="sheet-head">
+  return `<header class="sheet-head spot-head">
+    ${hero}
     <div class="sheet-head-row">
-    ${thumb}
     <div class="grow"><h1 class="t-title clamp2" data-expand aria-expanded="false">${esc(spot.name)}</h1><p class="t-sub c-sub">${esc(spot.address)}</p>${scene}${credit}</div>
     ${btn}
     </div>
@@ -258,13 +282,13 @@ function spotBody(spot, { works, preview, hasCourse }) {
 export function spotScreenMobile(spot, ctx, { mapOn, level }) {
   if (!mapOn) {
     return `<div class="map-ctrl is-static" style="padding-left:var(--gutter);padding-right:var(--gutter)">
-      <button class="btn-icon" data-action="back" aria-label="뒤로 가기">${icon.back()}</button></div>
+      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button></div>
       <section class="sheet is-static">${spotHead(spot)}<div class="sheet-body">${spotBody(spot, ctx)}</div></section>`;
   }
   return `
     ${topBrand()}
     <div class="map-ctrl is-below">
-      <button class="btn-icon" data-action="back" aria-label="뒤로 가기">${icon.back()}</button>
+      <button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button>
     </div>
     <section class="sheet" id="sheet" data-level="${level}">
       <div class="sheet-grip" data-drag><span></span></div>
@@ -276,7 +300,7 @@ export function spotScreenMobile(spot, ctx, { mapOn, level }) {
 // PC: 지도 위 상세 패널
 export function spotDetail(spot, ctx) {
   return `<article class="page">
-    <div class="lowbar is-close"><button class="btn-icon" data-action="close-panel" aria-label="닫기">${icon.close()}</button></div>
+    <div class="lowbar is-close"><button class="btn-icon" data-action="close-panel" aria-label="${esc(COPY.close)}">${icon.close()}</button></div>
     ${spotHead(spot)}
     ${spotBody(spot, ctx)}
   </article>`;
@@ -285,7 +309,7 @@ export function spotDetail(spot, ctx) {
 // ── S4 ──
 export function courseScreen(spot, { work, pc }) {
   return `<article class="page">
-    <div class="topbar"><button class="btn-icon" data-action="back" aria-label="뒤로 가기">${icon.back()}</button><span class="t-strong">${esc(COPY.courseTopbar)}</span></div>
+    <div class="topbar"><button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button><span class="t-strong">${esc(COPY.courseTopbar)}</span></div>
     <div class="page-body">
       <h1 class="t-title">${esc(spot.name)} 근처 코스</h1>
       <div id="course-status"></div>
@@ -358,7 +382,7 @@ export function placeScreen(place, { spot, distance, canMap = false, pc = false 
 // 장소 지도(모바일): 촬영지 번호 핀과 이 장소 핀을 한 화면에 보여 주는 보기 전용 지도(2026-10-30 사용자 결정, S5의 "지도로 보기").
 export function placeMapScreen(place, { spot, distance }) {
   return `
-    <div class="map-ctrl"><button class="btn-icon" data-action="back" aria-label="뒤로 가기">${icon.back()}</button></div>
+    <div class="map-ctrl"><button class="btn-icon" data-action="back" aria-label="${esc(COPY.back)}">${icon.back()}</button></div>
     <section class="map-card" id="map-card">
       <p class="meta"><span class="chip-kind">${KIND_LABEL[place.kind]}</span><span class="t-sub">${esc(spot.name)}에서 직선 ${dist(distance)}</span></p>
       <h1 class="t-title">${esc(place.name)}</h1>
@@ -366,12 +390,12 @@ export function placeMapScreen(place, { spot, distance }) {
     </section>`;
 }
 
-export function pcFrame(work, { selectedId }) {
+export function pcFrame(work, { selectedId, fit = false }) {
   return `
     <header class="pc-top">
       <button class="brand" data-action="home">${logoMark()}<span class="wordmark" lang="en">${esc(COPY.wordmark)}</span></button>
       <div class="pc-search">
-        <label class="search"><span class="sr-only">작품 검색</span>
+        <label class="search"><span class="sr-only">${esc(COPY.searchLabel)}</span>
           <input id="pc-q" type="search" autocomplete="off" placeholder="${esc(COPY.searchPlaceholder)}" value="${esc(work.title)}">
           <span class="btn-icon" aria-hidden="true">${icon.search()}</span>
         </label>
@@ -379,7 +403,7 @@ export function pcFrame(work, { selectedId }) {
       </div>
       ${themeButton()}
     </header>
-    <aside class="pc-list" id="pc-list">${workHead(work)}<div class="sheet-body">${spotList(work, selectedId)}</div></aside>
+    <aside class="pc-list" id="pc-list">${workHead(work, { fit })}<div class="sheet-body">${spotList(work, selectedId)}</div></aside>
     <section class="pc-detail" id="pc-detail" hidden></section>`;
 }
 

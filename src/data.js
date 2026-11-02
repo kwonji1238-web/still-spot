@@ -17,6 +17,10 @@ const REGION = 'busan';
 const clean = (v) => (typeof v === 'string' ? v.trim() : '');
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+// 촬영지 이름 앞에 "[폐업]"(오타 "[페업]" 포함)이 붙은 곳은 화면에 내지 않는다. data/cinemap.json에서는 지우지 않는다(2026-11-02 사용자 요청).
+// "[철거]"는 사용자가 정하지 않아 그대로 둔다. id는 원본 순서 번호라 거르기 전에 정해서 바뀌지 않게 한다.
+export const isClosedSpot = (name) => /^\s*\[\s*(?:폐업|페업)\s*\]/.test(name);
+
 export function adaptSpots(raw) {
   return raw.map((r, i) => {
     const lat = num(r.lat);
@@ -34,15 +38,19 @@ export function adaptSpots(raw) {
       // 위치 정확도 3단계(design.md 4-11)에 쓸 수 있는 필드지만, 지금은 "주소만 표시"(빈 고리)만 쓴다.
       geocodeStatus: clean(r['변환상태']),
     };
-  });
+  }).filter((s) => !isClosedSpot(s.name));
 }
+
+// 관광지 이름 뒤에 붙은 지원 언어 표기 "(한,영,중간,중번,일)"는 이름이 아니라서 뗀다(2026-11-02 사용자 요청)
+const LANG_NOTE = /\s*\(\s*(?:(?:한|영|중간|중번|중|일)\s*,?\s*)+\)/g;
+export const stripLangNote = (name) => name.replace(LANG_NOTE, '').trim();
 
 export function adaptAttractions(raw) {
   return raw.map((r) => ({
     id: `a${r.UC_SEQ}`,
     kind: 'attraction',
     region: REGION,
-    name: clean(r.MAIN_TITLE),
+    name: stripLangNote(clean(r.MAIN_TITLE)),
     address: clean(r.ADDR1),
     lat: num(r.LAT),
     lng: num(r.LNG),
@@ -115,6 +123,8 @@ export function buildIndex({ cinemap, attractions, restaurants, posters = {}, sc
     s.scene = scenes[`${s.work}|${s.name}`] || null;
     s.photo = SPOT_PHOTOS[s.name]?.image || null;
     s.photoCredit = SPOT_PHOTOS[s.name]?.credit || null;
+    const sp = SPOT_PHOTOS[s.name];
+    s.photos = sp?.images || (sp?.image ? [sp.image] : []);
   }
   const works = buildWorks(spots);
   // 포스터는 data/posters.json(scripts/posters.mjs가 만든다)에 있는 작품만 붙는다. 없으면 빈 프레임.

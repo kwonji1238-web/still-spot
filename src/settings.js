@@ -12,8 +12,11 @@ export const COPY = {
   searchPlaceholder: '국내 영화나 드라마를 검색하세요',
   trendingLabel: '요즘 뜨는 촬영지',
   matchingLabel: '일치하는 작품',
+  matchingSpotLabel: '일치하는 촬영지',
   // TODO(열린 결정: 검색 결과 없음 문구) 2026-11-01 와이어프레임 이미지의 예시 문구를 그대로 썼다.
   noResult: '일치하는 작품, 촬영지가 없어요',
+  noResultHint: '띄어쓰기나 철자를 바꿔 검색해 보세요',
+  emptyQuery: '작품 이름을 입력해 주세요',
   photoSpotLabel: '사진 남기기 좋은 촬영지',
   backToMap: '지도로 돌아가기',
   noCoords: '지도에는 표시할 수 없어요. 주소만 안내해요',
@@ -29,7 +32,7 @@ export const COPY = {
   // S3(촬영지 바텀시트, 2026-11-01 와이어프레임)
   worksHereTitle: '이 장소에서 촬영된 작품',
   reviewsTitle: '다녀온 후기',
-  reviewsSoon: '준비중이에요',
+  reviewsSoon: '준비 중이에요',
   intro: '소개',
   cancel: '취소',
   source:
@@ -49,9 +52,18 @@ export const COPY = {
   goHome: '스틸스팟 첫 화면으로',
   locate: '본인 위치',
   locateDialog: '현재는 부산 지역만 서비스하고 있어요',
-  locateBody: '원활한 탐색을 위해 부산 지역으로 이동할까요?',
-  locateGo: '이동하기',
+  locateBody: '지도를 부산으로 옮겨 드릴까요?',
+  locateGo: '부산으로 이동',
+  // 위치를 못 받았을 때(권한 거부·시간 초과·미지원). 부산 밖일 때와 다른 안내다.
+  locateFailTitle: '위치를 확인하지 못했어요',
+  locateFailBody: '위치 접근을 허용하면 내 위치를 지도에 보여 드려요',
   close: '닫기',
+  back: '뒤로 가기',
+  searchLabel: '작품 검색',
+  searchSubmit: '검색',
+  sheetFold: '목록 접기',
+  sheetUnfold: '목록 펼치기',
+  fitWork: '이 작품의 촬영지 모두 보기',
   // TODO(열린 결정: 테마 전환 버튼의 문구) design.md·naming.md에 없는 안내 문구라 임시로 정했다. 아이콘 버튼의 접근성 이름으로만 쓴다.
   themeToDark: '다크 모드로 전환',
   themeToLight: '라이트 모드로 전환',
@@ -65,9 +77,12 @@ export const KIND_LABEL = { spot: '촬영지', attraction: '관광지', restaura
 // TODO(열린 결정: 카드를 눌렀을 때 이동 대상) 지금은 그 촬영지의 지도 화면(S2)에서 핀을 강조한다. 촬영지 바텀시트를 고칠 때 함께 정한다.
 const DOMOHEON_PHOTO = { image: 'images/domoheon.jpg', credit: '[출처 : 부산시]' };
 
-// 촬영지 상세(S3) 맨 앞 썸네일 사진. 키는 촬영지 이름이고 같은 이름의 촬영지(모든 작품)에 붙는다. 없는 촬영지는 서비스 로고.
+// 촬영지 상세(S3) 맨 위 이미지 영역의 사진(images 배열이면 여러 장이 캐러셀로 보인다). 키는 촬영지 이름이고 같은 이름의 촬영지(모든 작품)에 붙는다. 없는 촬영지는 서비스 로고.
 // 데이터에 촬영지 사진이 없어서 images/에 둔 파일만 쓴다(2026-11-01 사용자 지정: 도모헌).
-export const SPOT_PHOTOS = { '부산시 열린행사장': DOMOHEON_PHOTO };
+export const SPOT_PHOTOS = {
+  '부산시 열린행사장': DOMOHEON_PHOTO,
+  '문화공감수정(정란각)': { image: 'images/jeongrangak.jpg', images: ['images/jeongrangak.jpg', 'images/jeongrangak-inside.jpg'] },
+};
 
 export const FEATURED = {
   trending: [

@@ -1,11 +1,19 @@
 // 카카오맵 JavaScript SDK 래퍼. SDK가 없거나 실패하면 지도만 빠지고 나머지 화면은 그대로 쓴다.
 // 지도는 라이트·다크 모두 기본(밝은) 타일로 둔다.
 
-import { corners, esc } from './render.js';
+import { corners, esc, icon } from './render.js';
 
 const SDK_TIMEOUT_MS = 8000;
 const CLUSTER_CELL_PX = 60;
-const NO_CLUSTER_LEVEL = 3;
+// 이 확대 수준(카카오 레벨, 작을수록 확대) 이하에서는 묶지 않고 모두 흩뿌린다(2026-11-02 사용자 요청)
+const NO_CLUSTER_LEVEL = 5;
+// 전체 촬영지 핀은 확대 수준에 따라 무게를 바꾼다(2026-11-02 사용자 승인: 검은 핀이 지도를 덮지 않게).
+// far: 속이 빈 작은 사각형 / mid: 흰 면 + 검은 꺾쇠 / near: 검은 면 + 흰 꺾쇠 + 이름표. 값은 카카오 레벨(작을수록 확대).
+const TIER_NEAR_MAX_LEVEL = 3;
+const TIER_MID_MAX_LEVEL = 5;
+const tierOf = (level) => (level <= TIER_NEAR_MAX_LEVEL ? 'near' : level <= TIER_MID_MAX_LEVEL ? 'mid' : 'far');
+// 한 칸(CLUSTER_CELL_PX)에 이 수 이상이 뭉쳐 있을 때만 묶음 핀으로 보인다. 그보다 적으면 핀을 따로 보인다(2026-11-02 사용자 요청: 30개 이상)
+const CLUSTER_MIN_MEMBERS = 30;
 let sdkPromise = null;
 
 export function loadKakao(key) {
@@ -39,17 +47,19 @@ function boundsOf(points) {
   return b;
 }
 
-function pinEl({ no, selected, label, nearby, all, cluster, clickable }) {
+function pinEl({ no, selected, label, nearby, all, cluster, clickable, tier, kind }) {
+  // 식당·카페 핀은 사각 프레임(꺾쇠) 대신 종류를 알려 주는 아이콘을 넣는다(2026-11-02 사용자 요청)
+  const glyph = nearby && (kind === 'restaurant' || kind === 'cafe') ? icon[kind === 'cafe' ? 'cafe' : 'food']() : '';
   const tag = clickable ? 'button' : 'div';
-  const cls = ['pin', 'framed', selected && 'is-sel', nearby && 'is-nearby', all && 'is-all', cluster != null && 'is-cluster'].filter(Boolean).join(' ');
-  const size = cluster != null ? 8 : all ? 5 : nearby ? 5 : selected ? 7 : 6;
+  const cls = ['pin', 'framed', selected && 'is-sel', nearby && 'is-nearby', all && 'is-all', glyph && 'is-glyph', all && tier && `is-t-${tier}`, cluster != null && 'is-cluster'].filter(Boolean).join(' ');
+  const size = cluster != null ? 8 : all ? (tier === 'mid' ? 4 : 5) : nearby ? 5 : selected ? 7 : 6;
   const name = cluster != null ? `촬영지 ${cluster}곳` : no != null ? `${no}번 ${label ?? ''}` : label ?? '';
   const aria = clickable ? ` type="button" aria-label="${esc(name)}"` : ' aria-hidden="true"';
   const el = document.createElement('div');
   el.className = 'pin-wrap';
   el.innerHTML =
-    `<${tag} class="${cls}"${aria}>${corners(size, 1.5)}${no != null ? `<span>${no}</span>` : ''}${cluster != null ? `<span>${cluster.toLocaleString('ko-KR')}</span>` : ''}</${tag}>` +
-    (label && (selected || nearby) ? `<span class="pin-label">${esc(label)}</span>` : '');
+    `<${tag} class="${cls}"${aria}>${glyph || (tier === 'far' && all ? '' : corners(size, 1.5))}${no != null ? `<span>${no}</span>` : ''}${cluster != null ? `<span>${cluster.toLocaleString('ko-KR')}</span>` : ''}</${tag}>` +
+    (label && (selected || nearby || (all && tier === 'near')) ? `<span class="pin-label">${esc(label)}</span>` : '');
   return el;
 }
 
@@ -132,25 +142,39 @@ export class MainMap {
     this.layers.spots = [];
     const proj = this.map.getProjection();
     const cell = CLUSTER_CELL_PX;
-    const noCluster = this.map.getLevel() <= NO_CLUSTER_LEVEL;
+    const level = this.map.getLevel();
+    const tier = tierOf(level);
+    const noCluster = level <= NO_CLUSTER_LEVEL;
     const cells = new Map();
     for (const p of this.all.places) {
       const pt = proj.containerPointFromCoords(ll(p));
       if (pt.x < -cell || pt.x > w + cell || pt.y < -cell || pt.y > h + cell) continue; // 화면 밖은 그리지 않는다
-      const key = noCluster ? `${p.lat},${p.lng}` : `${Math.floor(pt.x / cell)},${Math.floor(pt.y / cell)}`;
+      const key = `${Math.floor(pt.x / cell)},${Math.floor(pt.y / cell)}`;
       (cells.get(key) || cells.set(key, []).get(key)).push(p);
     }
-    for (const members of cells.values()) {
+    const pinGroup = (members) => {
       if (members.length === 1) {
         const p = members[0];
-        this.add('spots', p, { all: true, label: p.spot.name, clickable: true }, () => this.all.onPick(p.spot));
-        continue;
+        return this.add('spots', p, { all: true, tier, label: p.spot.name, clickable: true }, () => this.all.onPick(p.spot));
       }
       const center = {
         lat: members.reduce((a, m) => a + m.lat, 0) / members.length,
         lng: members.reduce((a, m) => a + m.lng, 0) / members.length,
       };
       this.add('spots', center, { cluster: members.length, clickable: true }, () => this.zoomTo(members));
+    };
+    for (const members of cells.values()) {
+      if (!noCluster && members.length >= CLUSTER_MIN_MEMBERS) {
+        pinGroup(members);
+        continue;
+      }
+      // 묶지 않는 칸: 좌표가 같은 촬영지(한 장소를 찍은 여러 작품)만 한 핀으로 보이고 나머지는 따로 보인다
+      const same = new Map();
+      for (const p of members) {
+        const k = `${p.lat},${p.lng}`;
+        (same.get(k) || same.set(k, []).get(k)).push(p);
+      }
+      for (const g of same.values()) pinGroup(g);
     }
   }
 
@@ -167,7 +191,7 @@ export class MainMap {
   setNearby(candidates, onPick) {
     this.clear('nearby');
     for (const c of candidates) {
-      this.add('nearby', c.place, { nearby: true, label: c.place.name, clickable: !!onPick }, onPick && (() => onPick(c.place)));
+      this.add('nearby', c.place, { nearby: true, kind: c.place.kind, label: c.place.name, clickable: !!onPick }, onPick && (() => onPick(c.place)));
     }
   }
 
