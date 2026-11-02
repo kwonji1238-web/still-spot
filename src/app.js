@@ -210,8 +210,7 @@ function drawHomeMap(st) {
   app.main.fit(app.db.spots.filter((s) => s.lat !== null), HOME_PADDING);
 }
 
-// 핀을 누르면 그 작품의 지도 화면(S2)에서 이 핀을 강조한다. PC는 상세 패널을 연다. [제안]
-// TODO(열린 결정: 첫 화면 핀을 눌렀을 때 이동 대상)
+// 핀을 누르면 그 작품의 지도 화면(S2)에서 이 핀을 선택한 상태로 열고, PC는 상세 패널을 연다.
 function pickHomePin(spot) {
   app.keepView = true; // 핀을 눌러 들어올 때는 시트만 올라오고 지도는 그 자리에 둔다
   navigate(document.body.dataset.layout === 'pc' ? href.spot(spot.id) : href.work(spot.work, spot.id));

@@ -1,4 +1,4 @@
-// 라이트·다크 전환. 값은 styles.css의 토큰이 정하고, 여기서는 <html data-theme>만 바꾼다.
+// 라이트·다크 전환. 값은 src/styles.css의 토큰이 정하고, 여기서는 <html data-theme>만 바꾼다.
 // 직접 고른 값은 localStorage에 저장한다(index.html 맨 위의 작은 스크립트가 같은 키로 먼저 읽어 깜빡임을 막는다).
 // 고른 적이 없으면 기기 설정(prefers-color-scheme)을 따른다. 지도 타일은 어느 쪽이든 밝은 타일로 고정이다.
 

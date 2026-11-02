@@ -320,7 +320,7 @@ button.pin::after { content: ""; position: absolute; inset: -10px; } /* 누르�
   white-space: nowrap; max-width: 12rem; overflow: hidden; text-overflow: ellipsis;
   font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif;
 }
-/* TODO(열린 결정: 근처 장소 핀 모양) [제안] 번호 없는 작은 핀 + 이름표. 크기는 24px보다 작게만 정해져 있다. */
+/* 근처 장소 핀: 번호 없는 18px 핀 + 이름표 */
 .pin.is-nearby { width: 18px; height: 18px; background: var(--map-pin-soft-bg); }
 .pin.is-nearby::after { inset: -13px; } /* 누르는 영역 44px */
 /* 첫 화면의 모든 촬영지 핀: 번호 없음. 겹침이 많아 24px보다 작게 둔다 */

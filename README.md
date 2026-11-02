@@ -29,12 +29,11 @@
 
 ```
 index.html            진입 페이지
-styles.css            디자인 토큰과 스타일
-src/                  앱 코드 (data, search, geo, candidates, course, api, app, render, map, theme, featured, settings)
+src/                  앱 코드 (data, search, geo, candidates, course, api, app, render, map, theme, featured, settings)와 styles.css(디자인 토큰·스타일)
 netlify/functions/    OpenAI 코스 설명 함수
 data/                 원본 데이터(JSON), 장면 설명(scenes.json)과 출처
 images/               촬영지 사진 (출처는 images/CREDITS.md)
-icon/                 파비콘과 앱 아이콘
+icon/                 파비콘, 앱 아이콘, site.webmanifest
 scripts/              빌드·개발 서버·데이터 만들기 스크립트
 tests/                node --test 테스트
 docs/data-schema.md   데이터 구조 설명

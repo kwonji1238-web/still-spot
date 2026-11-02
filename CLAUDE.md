@@ -29,7 +29,7 @@
 - 데이터는 `data/*.json` 스냅샷을 브라우저에서 읽는다. 검색·거리 계산·규칙 기반 코스도 브라우저에서 한다. 배포본의 데이터는 `scripts/slim.mjs`가 화면에서 쓰는 필드만 남긴 사본이다.
 - 서버 코드는 OpenAI를 부르는 Netlify Function 하나(`netlify/functions/course.js`)뿐이다. 후보에 없는 장소를 지어낸 응답은 버리고 규칙 기반 코스로 대체한다.
 - 지도는 카카오맵 JavaScript SDK. 배포 주소를 카카오 개발자 사이트의 JavaScript SDK 도메인에 등록해야 보인다(사람이 한다).
-- 구조: `index.html`, `styles.css`, `src/`, `netlify/functions/course.js`, `scripts/`, `tests/`, `docs/`, `data/`, `images/`, `icon/`.
+- 구조: `index.html`, `src/`(앱 코드와 `styles.css`), `netlify/functions/course.js`, `scripts/`, `tests/`, `docs/`, `data/`, `images/`, `icon/`.
 - 테스트: Node 내장 `node --test`(`npm test`). 테스트는 순수 함수(검색·거리·후보 선택·코스 검증·데이터 변환) 위주로 하고, 화면은 브라우저에서 직접 확인한다. 변경한 뒤에는 테스트를 돌리고 모바일 폭(390px)에서 깨지지 않는지 본다.
 
 ## 키와 비밀 값
@@ -63,7 +63,7 @@
 - 그림자, 그라데이션, 질감 이미지를 쓰지 않는다(지도 위 검색창의 그림자 하나만 예외). 층은 1px 선으로 나눈다.
 - 서체는 Pretendard Variable, 굵기 400과 700만. 영문 워드마크 "STILL-SPOT"만 Michroma(400 하나).
 - 누르는 영역은 44px 이상. 폭 767px 이하는 모바일, 768px 이상은 왼쪽 목록 패널 + 지도 + 지도 위 상세 패널.
-- 움직임은 `styles.css` 맨 아래 모션 블록에 모은다. 속성을 지정하고(`transition: all` 금지), `prefers-reduced-motion`에서는 크기·위치 움직임을 끈다. 핀 누르기·지도 이동 같은 반복 동작에는 움직임을 넣지 않는다.
+- 움직임은 `src/styles.css` 맨 아래 모션 블록에 모은다. 속성을 지정하고(`transition: all` 금지), `prefers-reduced-motion`에서는 크기·위치 움직임을 끈다. 핀 누르기·지도 이동 같은 반복 동작에는 움직임을 넣지 않는다.
 - 지도는 라이트·다크 모두 밝은 타일로 고정한다.
 
 ## 하지 말 것

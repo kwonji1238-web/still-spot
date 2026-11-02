@@ -8,10 +8,10 @@ const OUT = 'dist';
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(`${OUT}/data`, { recursive: true });
 
-for (const f of ['index.html', 'styles.css', 'site.webmanifest']) cpSync(f, `${OUT}/${f}`);
+cpSync('index.html', `${OUT}/index.html`);
 // 화면에서 쓰는 아이콘만 복사한다(icon/에는 락업·심볼 같은 원본도 있다). favicon.ico는 루트에도 둔다(옛 도구가 /favicon.ico를 찾는다).
 mkdirSync(`${OUT}/icon`, { recursive: true });
-for (const f of ['favicon.svg', 'favicon.ico', 'favicon-16.png', 'favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
+for (const f of ['site.webmanifest', 'favicon.svg', 'favicon.ico', 'favicon-16.png', 'favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
   cpSync(`icon/${f}`, `${OUT}/icon/${f}`);
 }
 cpSync('icon/favicon.ico', `${OUT}/favicon.ico`);
