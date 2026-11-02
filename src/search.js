@@ -1,5 +1,7 @@
 // 작품 검색: 띄어쓰기를 무시한 부분 일치 [제안], 앞부분 일치를 위로.
 
+import { representativeSpot } from './data.js';
+
 export const normalize = (s) => s.replace(/\s+/g, '').toLowerCase();
 
 // 원문 글자 위치 ↔ 정규화 글자 위치 대응표
@@ -43,17 +45,17 @@ function toRanges(positions) {
 export function searchSpots(spots, query, limit = 10) {
   const q = normalize(query);
   if (!q) return [];
-  const seen = new Set();
-  const hits = [];
+  const groups = new Map();
   for (const spot of spots) {
     const key = `${spot.name}|${spot.address}`;
-    if (seen.has(key)) continue;
     const inName = normalize(spot.name).indexOf(q);
     const inAddr = normalize(spot.address || '').indexOf(q);
     if (inName < 0 && inAddr < 0) continue;
-    seen.add(key);
-    hits.push({ spot, at: inName >= 0 ? inName : 1e6 + inAddr, len: spot.name.length });
+    if (!groups.has(key)) groups.set(key, { list: [], at: inName >= 0 ? inName : 1e6 + inAddr, len: spot.name.length });
+    groups.get(key).list.push(spot);
   }
+  // 같은 장소를 찍은 촬영지가 여럿이면 장면 설명이 있는 것을 대표로 보인다
+  const hits = [...groups.values()].map((g) => ({ spot: representativeSpot(g.list), at: g.at, len: g.len }));
   hits.sort((a, b) => a.at - b.at || a.len - b.len || a.spot.name.localeCompare(b.spot.name, 'ko'));
   return hits.slice(0, limit).map(({ spot, at }) => ({
     spot,

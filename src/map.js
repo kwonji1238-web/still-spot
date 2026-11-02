@@ -4,6 +4,7 @@
 import { corners, esc, icon } from './render.js';
 import { KIND_LABEL } from './settings.js';
 import { formatDistance } from './geo.js';
+import { representativeSpot } from './data.js';
 
 const SDK_TIMEOUT_MS = 8000;
 const CLUSTER_CELL_PX = 60;
@@ -155,9 +156,11 @@ export class MainMap {
     for (const s of spots) {
       if (s.lat === null) continue;
       const k = `${s.lat},${s.lng}`;
-      if (!byPos.has(k)) byPos.set(k, { spot: s, lat: s.lat, lng: s.lng });
+      if (!byPos.has(k)) byPos.set(k, { list: [], lat: s.lat, lng: s.lng });
+      byPos.get(k).list.push(s);
     }
-    this.all = { places: [...byPos.values()], onPick };
+    // 같은 좌표(한 장소)의 핀은 장면 설명이 있는 촬영지를 대표로 연다
+    this.all = { places: [...byPos.values()].map((g) => ({ spot: representativeSpot(g.list), lat: g.lat, lng: g.lng })), onPick };
     if (!this.allListener) {
       this.allListener = () => this.drawAll();
       kakao.maps.event.addListener(this.map, 'idle', this.allListener);

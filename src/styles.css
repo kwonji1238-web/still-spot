@@ -342,6 +342,9 @@ button.pin::after { content: ""; position: absolute; inset: -10px; } /* 누르�
 }
 /* 아래로 스크롤하면 이미지 영역이 접히고 이름·주소·장면 설명만 남는다(src/app.js의 updateSpotHero). 머리말 사이 간격만큼 당겨 빈틈을 없앤다 */
 .is-hero-off .spot-hero { height: 0; opacity: 0; margin-bottom: -0.75rem; }
+/* 모바일 시트에서는 접힌 뒤 장소명과 장면 설명만 남기려고 주소도 접는다(PC 패널은 주소를 그대로 둔다) */
+.spot-addr { max-height: 1.5rem; overflow: hidden; transition: max-height 200ms var(--ease-out), opacity 200ms var(--ease-out); }
+.sheet.is-hero-off .spot-addr { max-height: 0; opacity: 0; }
 .spot-hero-track {
   display: flex; gap: 0.5rem; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
   padding-right: var(--gutter); touch-action: pan-x; overscroll-behavior-x: contain;
@@ -520,7 +523,7 @@ html { -webkit-font-smoothing: antialiased; }
 /* 본인 위치 버튼: 시트가 움직이면 같이 부드럽게 움직인다. 손가락으로 끌 때는 그대로 따라간다 */
 .locate { transition: bottom 320ms var(--ease-drawer), transform 160ms var(--ease-out), background-color 160ms var(--ease-out), border-color 160ms var(--ease-out); }
 body.is-sheet-dragging .locate { transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out), border-color 160ms var(--ease-out); }
-@media (prefers-reduced-motion: reduce) { .locate, .spot-hero { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .locate, .spot-hero, .spot-addr { transition: none; } }
 
 .poster-btn { display: block; flex: none; padding: 0; width: 4rem; height: 5.75rem; }
 .poster-btn .poster { display: block; }

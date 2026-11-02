@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { buildIndex, adaptRestaurants, spotsAtSamePlace, stripLangNote, isClosedSpot } from '../src/data.js';
+import { buildIndex, adaptRestaurants, spotsAtSamePlace, stripLangNote, isClosedSpot, representativeSpot } from '../src/data.js';
 import { searchWorks, searchSpots, normalize } from '../src/search.js';
 import { distanceM, formatDistance } from '../src/geo.js';
 import { previewCandidates, courseCandidates, coursePool } from '../src/candidates.js';
@@ -333,4 +333,17 @@ test('촬영지 목록: 좌표 있는 촬영지는 무작위 순서(번호는 �
     assert.ok(w.spots.slice(withNo.length).every((s) => s.lat === null && s.no === null));
     assert.deepEqual([...w.spots.map((s) => s.id)].sort(), [...sorted.works.find((x) => x.title === w.title).spots.map((s) => s.id)].sort(), '촬영지가 빠지거나 늘지 않았다');
   }
+});
+
+test('같은 장소의 촬영지가 여럿이면 소개 카드의 작품 → 장면 설명이 있는 것 → 첫 번째 순으로 대표를 쓴다(핀·촬영지 검색)', () => {
+  const withScenes = buildIndex({ cinemap: read('cinemap.json'), attractions: [], restaurants: [], scenes: read('scenes.json') });
+  const same = withScenes.spots.filter((s) => s.name === '문화공감수정(정란각)' && s.lat !== null);
+  assert.ok(same.length >= 2, '정란각은 작품마다 촬영지가 따로 있다');
+  assert.notEqual(same[0].work, '범죄와의 전쟁: 나쁜놈들 전성시대', '원본 순서로는 다른 작품이 먼저다');
+  assert.equal(representativeSpot(same).work, '범죄와의 전쟁: 나쁜놈들 전성시대');
+  assert.ok(representativeSpot(same).scene.startsWith('최익현'));
+  const hit = searchSpots(withScenes.spots, '정란각')[0].spot;
+  assert.equal(hit.work, '범죄와의 전쟁: 나쁜놈들 전성시대');
+  assert.equal(representativeSpot([{ id: 'a', work: 'x', name: 'y', scene: null }, { id: 'b', work: 'x', name: 'y', scene: '설명' }]).id, 'b');
+  assert.equal(representativeSpot([{ id: 'a', work: 'x', name: 'y', scene: null }, { id: 'b', work: 'x', name: 'y', scene: null }]).id, 'a');
 });

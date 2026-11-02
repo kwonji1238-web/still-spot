@@ -239,7 +239,7 @@ function spotHead(spot, { toggle = null } = {}) {
   return `<header class="sheet-head spot-head">
     ${hero}
     <div class="sheet-head-row">
-    <div class="grow"><h1 class="t-title clamp2" data-expand aria-expanded="false">${esc(spot.name)}</h1><p class="t-sub c-sub">${esc(spot.address)}</p>${scene}${credit}</div>
+    <div class="grow"><h1 class="t-title clamp2" data-expand aria-expanded="false">${esc(spot.name)}</h1><p class="spot-addr t-sub c-sub">${esc(spot.address)}</p>${scene}${credit}</div>
     ${btn}
     </div>
   </header>`;

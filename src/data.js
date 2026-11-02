@@ -9,7 +9,7 @@
 //   menu?               // 식당·카페만: 대표메뉴(화면에는 쓰지 않고 AI 설명의 근거로만 씀)
 //   geocodeStatus?      // 촬영지만: 원본 '변환상태' (성공 / 키워드검색성공 / 실패)
 // }
-import { SPOT_PHOTOS } from './settings.js';
+import { SPOT_PHOTOS, FEATURED } from './settings.js';
 
 
 const REGION = 'busan';
@@ -112,6 +112,11 @@ export function buildWorks(spots, rand = Math.random) {
   }
   return works;
 }
+
+// 같은 장소를 찍은 촬영지가 여러 개일 때 지도 핀·촬영지 검색이 대표로 여는 촬영지.
+// 검색 화면 카드로 소개하는 작품(FEATURED)의 촬영지를 먼저, 없으면 장면 설명이 있는 것, 그것도 없으면 첫 번째를 고른다.
+const featuredKeys = new Set(Object.values(FEATURED).flat().map((f) => `${f.work}|${f.place}`));
+export const representativeSpot = (list) => list.find((s) => featuredKeys.has(`${s.work}|${s.name}`)) || list.find((s) => s.scene) || list[0];
 
 // 같은 장소(이름·주소가 같음)에서 촬영된 작품들의 촬영지. 이 촬영지가 맨 앞이고, 작품은 한 번씩만 나온다.
 export function spotsAtSamePlace(spot, spots) {
