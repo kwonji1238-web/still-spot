@@ -336,7 +336,12 @@ button.pin::after { content: ""; position: absolute; inset: -10px; } /* 누르�
 .pin .fc-bl { bottom: var(--fc-in); left: var(--fc-in); }
 .pin .fc-br { bottom: var(--fc-in); right: var(--fc-in); }
 /* 촬영지 상세 맨 위 이미지 영역(캐러셀): 왼쪽은 여백을 지키고 오른쪽은 화면 끝까지 열어 다음 사진이 걸쳐 보인다. 사진이 없으면 로고 */
-.spot-hero { position: relative; margin-right: calc(-1 * var(--gutter)); }
+.spot-hero {
+  position: relative; margin-right: calc(-1 * var(--gutter)); height: 9.5rem; overflow: hidden;
+  transition: height 200ms var(--ease-out), margin-bottom 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+/* 아래로 스크롤하면 이미지 영역이 접히고 이름·주소·장면 설명만 남는다(src/app.js의 updateSpotHero). 머리말 사이 간격만큼 당겨 빈틈을 없앤다 */
+.is-hero-off .spot-hero { height: 0; opacity: 0; margin-bottom: -0.75rem; }
 .spot-hero-track {
   display: flex; gap: 0.5rem; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
   padding-right: var(--gutter); touch-action: pan-x; overscroll-behavior-x: contain;
@@ -464,6 +469,11 @@ button.pin::after { content: ""; position: absolute; inset: -10px; } /* 누르�
   .pc-detail .page { min-height: 0; }
   .pc-detail .photo { height: 10.5rem; }
   .pc-detail .spot-slide { height: 10.5rem; }
+  .pc-detail .spot-hero { height: 10.5rem; }
+  .pc-detail.is-hero-off .spot-hero { height: 0; }
+  /* PC 패널: 닫기 줄과 머리말(이름·주소·설명)은 스크롤해도 위에 붙어 있다 */
+  .pc-detail .lowbar.is-close { position: sticky; top: 0; z-index: 3; background: var(--canvas); }
+  .pc-detail .spot-head { position: sticky; top: 3.75rem; z-index: 2; background: var(--canvas); border-bottom: 1px solid var(--hair); }
   .pc-detail .photo-wrap .btn-icon { right: 0.75rem; top: 0.75rem; }
   .pc-detail .lowbar.is-close { justify-content: flex-end; }
   /* 지도가 없을 때는 상세 패널을 지도 자리에 그대로 둔다 */
@@ -510,7 +520,7 @@ html { -webkit-font-smoothing: antialiased; }
 /* 본인 위치 버튼: 시트가 움직이면 같이 부드럽게 움직인다. 손가락으로 끌 때는 그대로 따라간다 */
 .locate { transition: bottom 320ms var(--ease-drawer), transform 160ms var(--ease-out), background-color 160ms var(--ease-out), border-color 160ms var(--ease-out); }
 body.is-sheet-dragging .locate { transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out), border-color 160ms var(--ease-out); }
-@media (prefers-reduced-motion: reduce) { .locate { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .locate, .spot-hero { transition: none; } }
 
 .poster-btn { display: block; flex: none; padding: 0; width: 4rem; height: 5.75rem; }
 .poster-btn .poster { display: block; }

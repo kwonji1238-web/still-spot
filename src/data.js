@@ -153,7 +153,9 @@ export function buildIndex({ cinemap, attractions, restaurants, posters = {}, sc
 
 export async function loadData(base = 'data/') {
   const get = async (f) => {
-    const res = await fetch(base + f);
+    // 빌드마다 바뀌는 값(config.js의 dataVersion)을 주소에 붙여, 새로 배포한 데이터를 브라우저가 옛 사본으로 쓰지 않게 한다
+    const v = globalThis.STILLSPOT_CONFIG?.dataVersion;
+    const res = await fetch(base + f + (v ? `?v=${v}` : ''));
     if (!res.ok) throw new Error(`${f} ${res.status}`);
     return res.json();
   };

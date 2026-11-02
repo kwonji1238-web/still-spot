@@ -36,5 +36,5 @@ const fromDotenv = () => {
   return line ? line.slice('KAKAO_JS_KEY='.length).trim().replace(/^["']|["']$/g, '') : '';
 };
 const key = process.env.KAKAO_JS_KEY || fromDotenv();
-writeFileSync(`${OUT}/config.js`, `window.STILLSPOT_CONFIG = ${JSON.stringify({ kakaoJsKey: key })};\n`);
+writeFileSync(`${OUT}/config.js`, `window.STILLSPOT_CONFIG = ${JSON.stringify({ kakaoJsKey: key, dataVersion: Date.now().toString(36) })};\n`);
 console.log(`dist/ 준비 완료 (KAKAO_JS_KEY ${key ? '있음' : '없음 — 지도 없이 동작'})`);

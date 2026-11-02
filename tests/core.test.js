@@ -92,12 +92,13 @@ test('촬영지: 장면 설명은 scenes.json에 있는 촬영지에만 붙는�
   assert.ok(db.spots.every((s) => s.scene === null));
 });
 
-test('촬영지 썸네일: 도모헌(출처 문구 있음)과 정란각에만 사진이 있다', () => {
+test('촬영지 사진: 도모헌(출처 문구 있음)·정란각·흰여울문화마을에만 있다', () => {
   const withPhoto = db.spots.filter((s) => s.photo);
   assert.ok(withPhoto.length >= 2);
-  assert.ok(withPhoto.every((s) => ['부산시 열린행사장', '문화공감수정(정란각)'].includes(s.name)));
+  assert.ok(withPhoto.every((s) => ['부산시 열린행사장', '문화공감수정(정란각)', '흰여울문화마을'].includes(s.name)));
   assert.ok(withPhoto.filter((s) => s.name === '부산시 열린행사장').every((s) => s.photo === 'images/domoheon.jpg' && s.photoCredit === '[출처 : 부산시]'));
-  assert.ok(withPhoto.filter((s) => s.name !== '부산시 열린행사장').every((s) => s.photo === 'images/jeongrangak.jpg'));
+  assert.ok(withPhoto.filter((s) => s.name === '문화공감수정(정란각)').every((s) => s.photo === 'images/jeongrangak.jpg'));
+  assert.ok(withPhoto.filter((s) => s.name === '흰여울문화마을').every((s) => s.photo === 'images/huinnyeoul.jpg' && s.photos.length === 1));
   assert.ok(existsSync(new URL('../images/domoheon.jpg', import.meta.url)));
   assert.ok(existsSync(new URL('../images/jeongrangak.jpg', import.meta.url)));
   const jr = withPhoto.find((s) => s.name === '문화공감수정(정란각)');

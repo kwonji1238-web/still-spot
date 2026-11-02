@@ -834,6 +834,28 @@ function attachMap() {
   }
 }
 
+// 촬영지 상세에서 아래로 스크롤하면 이미지 영역을 접고 이름·주소·장면 설명만 남긴다(모바일 시트·PC 패널 공통).
+// 접으면 보이는 칸이 늘어나므로, 접은 뒤에도 스크롤할 길이가 남을 때만 접는다(안 그러면 접었다 펴지길 반복한다).
+function updateSpotHero(scroller) {
+  const root = scroller.id === 'sheet-body' ? scroller.closest('#sheet') : scroller;
+  const hero = root?.querySelector('.spot-hero');
+  if (!hero) return;
+  if (!root.classList.contains('is-hero-off')) {
+    if (scroller.scrollTop > 24 && scroller.scrollHeight - scroller.clientHeight > hero.offsetHeight + 48) root.classList.add('is-hero-off');
+  } else if (scroller.scrollTop <= 4) {
+    root.classList.remove('is-hero-off');
+  }
+}
+// scroll 이벤트는 위로 전달되지 않아서 캡처 단계에서 한 번에 받는다
+document.addEventListener(
+  'scroll',
+  (e) => {
+    const t = e.target;
+    if (t instanceof Element && (t.id === 'sheet-body' || t.id === 'pc-detail')) updateSpotHero(t);
+  },
+  true,
+);
+
 // 지도 SDK 실패 안내(오류 안내 + 다시 시도 버튼)를 화면 위쪽에 붙인다. 이미 있으면 다시 만들지 않는다.
 // 목록·상세·코스 카드는 그대로 쓸 수 있고, 경로 시각화와 근처 장소 핀만 빠진다.
 function showMapFailNotice() {

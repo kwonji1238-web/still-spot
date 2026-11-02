@@ -82,6 +82,7 @@ const DOMOHEON_PHOTO = { image: 'images/domoheon.jpg', credit: '[출처 : 부산
 // 데이터에 촬영지 사진이 없어서 images/에 둔 파일만 쓴다.
 export const SPOT_PHOTOS = {
   '부산시 열린행사장': DOMOHEON_PHOTO,
+  '흰여울문화마을': { image: 'images/huinnyeoul.jpg' },
   '문화공감수정(정란각)': { image: 'images/jeongrangak.jpg', images: ['images/jeongrangak.jpg', 'images/jeongrangak-inside.jpg'] },
 };
 
